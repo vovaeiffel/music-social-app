@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createSupabaseClient } from "@/lib/supabase";
 import dynamic from "next/dynamic";
+import { User } from "@supabase/supabase-js";
 
 const supabase = createSupabaseClient();
 
@@ -42,7 +43,7 @@ type PinType = {
 };
 
 export default function Home() {
-  const [user, setUser] = useState<UserType | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [songTitle, setSongTitle] = useState("");
@@ -301,8 +302,8 @@ export default function Home() {
     else {
       const { error } = await supabase.from("pins").insert({
         user_id: user.id,
-        user_name: user.name,
-        user_avatar: user.avatar,
+        user_name: user.user_metadata?.full_name || "",
+        user_avatar: user.user_metadata?.avatar_url || "",
 
         song_title: songTitle,
         artist_name: artistName,
@@ -319,7 +320,9 @@ export default function Home() {
 
       if (error) {
         console.error(error);
-        alert("Error creating pin");
+
+        alert(JSON.stringify(error));
+
         return;
       }
 
@@ -383,9 +386,9 @@ export default function Home() {
   "
                 >
                   <div className="flex items-center gap-3">
-                    {user?.avatar && (
+                    {user?.user_metadata?.avatar_url && (
                       <img
-                        src={user.avatar}
+                        src={user.user_metadata.avatar_url}
                         alt="avatar"
                         className="w-10 h-10 rounded-full"
                       />
@@ -393,7 +396,9 @@ export default function Home() {
 
                     <div>
                       <p className="font-semibold">
-                        {user?.name || user?.email || "User"}
+                        {user?.user_metadata?.full_name ||
+                          user?.email ||
+                          "User"}
                       </p>
 
                       <p className="text-xs text-zinc-400">Logged in</p>
