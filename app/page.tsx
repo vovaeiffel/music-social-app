@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createSupabaseClient } from "@/lib/supabase";
 import dynamic from "next/dynamic";
-import { User } from "@supabase/supabase-js";
 
-const supabase = createSupabaseClient();
+import { auth, provider, db } from "@/lib/firebase";
+
+import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
+
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 
 const Map = dynamic(() => import("./components/Map"), {
   ssr: false,
@@ -43,23 +52,24 @@ type PinType = {
 };
 
 export default function Home() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserType | null>(null);
+
   const [loading, setLoading] = useState(true);
+
+  const [pins, setPins] = useState<PinType[]>([]);
 
   const [songTitle, setSongTitle] = useState("");
   const [artistName, setArtistName] = useState("");
   const [story, setStory] = useState("");
   const [placeName, setPlaceName] = useState("");
-  const [pins, setPins] = useState<PinType[]>([]);
+
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [spotifyUrl, setSpotifyUrl] = useState("");
+  const [yandexUrl, setYandexUrl] = useState("");
+
   const [selectedLat, setSelectedLat] = useState<number | null>(null);
 
   const [selectedLng, setSelectedLng] = useState<number | null>(null);
-
-  const [youtubeUrl, setYoutubeUrl] = useState("");
-
-  const [spotifyUrl, setSpotifyUrl] = useState("");
-
-  const [yandexUrl, setYandexUrl] = useState("");
 
   const [editingPinId, setEditingPinId] = useState<string | null>(null);
 
@@ -68,193 +78,110 @@ export default function Home() {
   const [selectedPin, setSelectedPin] = useState<PinType | null>(null);
 
   useEffect(() => {
-    async function init() {
-      await checkUser();
-      await loadPins();
-      await getLocation();
-    }
-
-    init();
+    checkUser();
+    loadPins();
+    getLocation();
   }, []);
 
-  /*useEffect(() => {
-    const channel = supabase
-      .channel("realtime-pins")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "pins",
-        },
-        async () => {
-          await loadPins(user?.id);
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "likes",
-        },
-        async () => {
-          await loadPins(user?.id);
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]);*/
-
   async function getLocation() {
-    if (!navigator.geolocation) {
-      alert("Geolocation is not supported");
-      return;
-    }
+    if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setSelectedLat(position.coords.latitude);
-
         setSelectedLng(position.coords.longitude);
       },
       (error) => {
         console.error(error);
-        alert("Could not get location");
       },
     );
   }
 
-  async function checkUser() {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+  function checkUser() {
+    onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          id: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          name: firebaseUser.displayName || "",
+          avatar: firebaseUser.photoURL || "",
+        });
+      } else {
+        setUser(null);
+      }
 
-      setUser(user);
-    } catch (error) {
-      console.error(error);
-    } finally {
       setLoading(false);
-    }
-  }
-
-  async function signInWithGoogle() {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
     });
   }
 
-  async function loadPins(currentUserId?: string) {
-    const { data: pinsData, error } = await supabase
-      .from("pins")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
+  async function signInWithGoogle() {
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (error) {
       console.error(error);
-      return;
     }
+  }
 
-    if (!pinsData) {
-      setPins([]);
-      return;
+  async function loadPins() {
+    try {
+      const querySnapshot = await getDocs(collection(db, "pins"));
+
+      const loadedPins: PinType[] = [];
+
+      querySnapshot.forEach((document) => {
+        loadedPins.push({
+          id: document.id,
+          ...(document.data() as Omit<PinType, "id">),
+        });
+      });
+
+      setPins(loadedPins);
+    } catch (error) {
+      console.error(error);
     }
-
-    const updatedPins = await Promise.all(
-      pinsData.map(async (pin) => {
-        const { count } = await supabase
-          .from("likes")
-          .select("*", {
-            count: "exact",
-            head: true,
-          })
-          .eq("pin_id", pin.id);
-
-        let likedByUser = false;
-
-        if (currentUserId) {
-          const { data: existingLike } = await supabase
-            .from("likes")
-            .select("id")
-            .eq("pin_id", pin.id)
-            .eq("user_id", currentUserId)
-            .maybeSingle();
-
-          likedByUser = !!existingLike;
-        }
-
-        return {
-          ...pin,
-          likes_count: count || 0,
-          liked_by_user: likedByUser,
-        };
-      }),
-    );
-
-    setPins(updatedPins);
   }
 
   async function toggleLike(pinId: string, liked: boolean) {
-    if (!user) return;
+    const updatedPins = pins.map((pin) => {
+      if (pin.id !== pinId) return pin;
 
-    if (liked) {
-      await supabase
-        .from("likes")
-        .delete()
-        .eq("pin_id", pinId)
-        .eq("user_id", user.id);
-    } else {
-      await supabase.from("likes").insert({
-        pin_id: pinId,
-        user_id: user.id,
+      return {
+        ...pin,
+        liked_by_user: !liked,
+        likes_count: liked
+          ? (pin.likes_count || 1) - 1
+          : (pin.likes_count || 0) + 1,
+      };
+    });
+
+    setPins(updatedPins);
+
+    if (selectedPin?.id === pinId) {
+      setSelectedPin({
+        ...selectedPin,
+        liked_by_user: !liked,
+        likes_count: liked
+          ? (selectedPin.likes_count || 1) - 1
+          : (selectedPin.likes_count || 0) + 1,
       });
-    }
-
-    await loadPins(user.id);
-    if (selectedPin) {
-      const updatedPins = await supabase
-        .from("pins")
-        .select("*")
-        .eq("id", selectedPin.id)
-        .single();
-
-      if (updatedPins.data) {
-        setSelectedPin({
-          ...updatedPins.data,
-          likes_count: liked
-            ? (selectedPin.likes_count || 1) - 1
-            : (selectedPin.likes_count || 0) + 1,
-
-          liked_by_user: !liked,
-        });
-      }
     }
   }
 
   async function deletePin(pinId: string) {
-    const { error } = await supabase.from("pins").delete().eq("id", pinId);
+    try {
+      await deleteDoc(doc(db, "pins", pinId));
 
-    if (error) {
+      await loadPins();
+
+      setSelectedPin(null);
+    } catch (error) {
       console.error(error);
-      alert("Error deleting pin");
-      return;
-    }
 
-    await loadPins();
+      alert("Error deleting pin");
+    }
   }
 
   async function createPin() {
-    console.log({
-      selectedLat,
-      selectedLng,
-      songTitle,
-      story,
-      user,
-    });
     if (!user) return;
 
     if (selectedLat === null || selectedLng === null) {
@@ -264,86 +191,74 @@ export default function Home() {
 
     if (!songTitle.trim() || !story.trim()) {
       alert("Fill required fields");
-
       return;
     }
 
-    // EDIT EXISTING PIN
-    if (editingPinId) {
-      const { error } = await supabase
-        .from("pins")
-        .update({
-          song_title: songTitle,
-          artist_name: artistName,
-          story: story,
-          place_name: placeName,
-
-          youtube_url: youtubeUrl,
-          spotify_url: spotifyUrl,
-          yandex_url: yandexUrl,
-
-          latitude: selectedLat,
-          longitude: selectedLng,
-        })
-        .eq("id", editingPinId);
-
-      if (error) {
-        console.error(error);
-        alert("Error updating pin");
-        return;
-      }
-
-      alert("Pin updated!");
-
-      setEditingPinId(null);
-    }
-
-    // CREATE NEW PIN
-    else {
-      const { error } = await supabase.from("pins").insert({
+    try {
+      const pinData = {
         user_id: user.id,
-        user_name: user.user_metadata?.full_name || "",
-        user_avatar: user.user_metadata?.avatar_url || "",
+
+        user_name: user.name || "",
+
+        user_avatar: user.avatar || "",
 
         song_title: songTitle,
+
         artist_name: artistName,
+
         story: story,
+
         place_name: placeName,
 
         youtube_url: youtubeUrl,
+
         spotify_url: spotifyUrl,
+
         yandex_url: yandexUrl,
 
         latitude: selectedLat,
+
         longitude: selectedLng,
-      });
 
-      if (error) {
-        console.error(error);
+        likes_count: 0,
 
-        alert(JSON.stringify(error));
+        liked_by_user: false,
 
-        return;
+        created_at: Date.now(),
+      };
+
+      if (editingPinId) {
+        await updateDoc(doc(db, "pins", editingPinId), pinData);
+
+        alert("Pin updated!");
+      } else {
+        await addDoc(collection(db, "pins"), pinData);
+
+        alert("Pin created!");
       }
 
-      alert("Pin created!");
+      await loadPins();
+
+      setSongTitle("");
+      setArtistName("");
+      setStory("");
+      setPlaceName("");
+
+      setYoutubeUrl("");
+      setSpotifyUrl("");
+      setYandexUrl("");
+
+      setSelectedLat(null);
+      setSelectedLng(null);
+
+      setEditingPinId(null);
+
+      setIsCreatingPin(false);
+    } catch (error) {
+      console.error(error);
+
+      alert("Error creating pin");
     }
-
-    await loadPins(user.id);
-
-    setSongTitle("");
-    setArtistName("");
-    setStory("");
-    setPlaceName("");
-
-    setYoutubeUrl("");
-    setSpotifyUrl("");
-    setYandexUrl("");
-
-    setSelectedLat(null);
-    setSelectedLng(null);
-
-    setIsCreatingPin(false);
   }
 
   if (loading) {
@@ -375,36 +290,30 @@ export default function Home() {
             <div className="bg-zinc-900 rounded-2xl p-6 h-full">
               <h2 className="text-2xl font-bold mb-4">Music Map</h2>
 
-              <div className="text-zinc-400 space-y-3">
-                <div
-                  className="
-    mt-6
-    p-4
-    rounded-xl
-    bg-zinc-800
-    text-white
-  "
-                >
-                  <div className="flex items-center gap-3">
-                    {user?.user_metadata?.avatar_url && (
-                      <img
-                        src={user.user_metadata.avatar_url}
-                        alt="avatar"
-                        className="w-10 h-10 rounded-full"
-                      />
-                    )}
+              <div className="flex items-center gap-3 mb-6">
+                {user.avatar && (
+                  <img
+                    src={user.avatar}
+                    alt="avatar"
+                    className="w-10 h-10 rounded-full"
+                  />
+                )}
 
-                    <div>
-                      <p className="font-semibold">
-                        {user?.user_metadata?.full_name ||
-                          user?.email ||
-                          "User"}
-                      </p>
+                <div className="flex-1">
+                  <p className="font-semibold">{user.name || user.email}</p>
 
-                      <p className="text-xs text-zinc-400">Logged in</p>
-                    </div>
-                  </div>
+                  <p className="text-xs text-zinc-400">Logged in</p>
                 </div>
+
+                <button
+                  onClick={() => signOut(auth)}
+                  className="text-sm bg-zinc-800 px-3 py-2 rounded-xl"
+                >
+                  Logout
+                </button>
+              </div>
+
+              <div className="text-zinc-400 space-y-3">
                 <p>Click anywhere on the map to create a music memory.</p>
 
                 <p>Select pins to explore stories from other people.</p>
@@ -415,12 +324,12 @@ export default function Home() {
           <div className="lg:col-span-2 space-y-6">
             <div
               className="
-              relative
-              h-[68vh]
-              min-h-[630px]
-              rounded-2xl
-              overflow-hidden
-            "
+                relative
+                h-[68vh]
+                min-h-[630px]
+                rounded-2xl
+                overflow-hidden
+              "
             >
               <Map
                 pins={pins.filter(
@@ -434,21 +343,15 @@ export default function Home() {
                   setEditingPinId(pin.id);
 
                   setSongTitle(pin.song_title || "");
-
                   setArtistName(pin.artist_name || "");
-
                   setStory(pin.story || "");
-
                   setPlaceName(pin.place_name || "");
 
                   setYoutubeUrl(pin.youtube_url || "");
-
                   setSpotifyUrl(pin.spotify_url || "");
-
                   setYandexUrl(pin.yandex_url || "");
 
                   setSelectedLat(pin.latitude);
-
                   setSelectedLng(pin.longitude);
 
                   setIsCreatingPin(true);
@@ -480,7 +383,9 @@ export default function Home() {
                     overflow-y-auto
                   "
                 >
-                  <h2 className="text-xl font-bold">Create Pin</h2>
+                  <h2 className="text-xl font-bold">
+                    {editingPinId ? "Edit Pin" : "Create Pin"}
+                  </h2>
 
                   <input
                     type="text"
@@ -539,23 +444,24 @@ export default function Home() {
 
                   <div className="flex gap-3">
                     <button
-                      type="button"
                       onClick={createPin}
                       className="
-      flex-1
-      bg-white
-      text-black
-      p-3
-      rounded-xl
-      font-semibold
-    "
+                        flex-1
+                        bg-white
+                        text-black
+                        p-3
+                        rounded-xl
+                        font-semibold
+                      "
                     >
-                      Create
+                      {editingPinId ? "Save" : "Create"}
                     </button>
 
                     <button
                       onClick={() => {
                         setIsCreatingPin(false);
+
+                        setEditingPinId(null);
 
                         setSelectedLat(null);
                         setSelectedLng(null);
