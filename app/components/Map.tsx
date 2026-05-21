@@ -405,6 +405,8 @@ export default function Map({
   setSelectedLng,
   setIsCreatingPin,
 }: Props) {
+  console.log("PINS:", pins);
+  console.log("SELECTED:", selectedLat, selectedLng);
   return (
     <div
       style={{
@@ -464,7 +466,7 @@ export default function Map({
           setIsCreatingPin={setIsCreatingPin}
         />
 
-        {selectedLat && selectedLng && (
+        {selectedLat !== null && selectedLng !== null && (
           <Marker position={[selectedLat, selectedLng]}>
             <Popup>
               <div className="text-black">New pin position</div>
