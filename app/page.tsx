@@ -128,22 +128,17 @@ export default function Home() {
   }
 
   async function checkUser() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    if (session?.user) {
-      setUser({
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.user_metadata.full_name,
-        avatar: session.user.user_metadata.avatar_url,
-      });
+      setUser(user);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
-
-    await loadPins(session?.user?.id);
-
-    setLoading(false);
   }
 
   async function signInWithGoogle() {
