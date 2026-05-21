@@ -247,9 +247,16 @@ export default function Home() {
   }
 
   async function createPin() {
+    console.log({
+      selectedLat,
+      selectedLng,
+      songTitle,
+      story,
+      user,
+    });
     if (!user) return;
 
-    if (!selectedLat || !selectedLng) {
+    if (selectedLat === null || selectedLng === null) {
       alert("Select place on map");
       return;
     }
