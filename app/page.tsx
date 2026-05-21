@@ -366,6 +366,33 @@ export default function Home() {
               <h2 className="text-2xl font-bold mb-4">Music Map</h2>
 
               <div className="text-zinc-400 space-y-3">
+                <div
+                  className="
+    mt-6
+    p-4
+    rounded-xl
+    bg-zinc-800
+    text-white
+  "
+                >
+                  <div className="flex items-center gap-3">
+                    {user?.avatar && (
+                      <img
+                        src={user.avatar}
+                        alt="avatar"
+                        className="w-10 h-10 rounded-full"
+                      />
+                    )}
+
+                    <div>
+                      <p className="font-semibold">
+                        {user?.name || user?.email || "User"}
+                      </p>
+
+                      <p className="text-xs text-zinc-400">Logged in</p>
+                    </div>
+                  </div>
+                </div>
                 <p>Click anywhere on the map to create a music memory.</p>
 
                 <p>Select pins to explore stories from other people.</p>
