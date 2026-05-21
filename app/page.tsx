@@ -500,15 +500,16 @@ export default function Home() {
 
                   <div className="flex gap-3">
                     <button
+                      type="button"
                       onClick={createPin}
                       className="
-                        flex-1
-                        bg-white
-                        text-black
-                        p-3
-                        rounded-xl
-                        font-semibold
-                      "
+      flex-1
+      bg-white
+      text-black
+      p-3
+      rounded-xl
+      font-semibold
+    "
                     >
                       Create
                     </button>
