@@ -410,8 +410,7 @@ export default function Map({
   return (
     <div
       style={{
-        height: "68vh",
-        minHeight: "630px",
+        height: "100vh",
         width: "100%",
       }}
       className="rounded-2xl overflow-hidden"
