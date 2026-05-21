@@ -76,7 +76,7 @@ export default function Home() {
     init();
   }, []);
 
-  useEffect(() => {
+  /*useEffect(() => {
     const channel = supabase
       .channel("realtime-pins")
       .on(
@@ -106,7 +106,7 @@ export default function Home() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user]);*/
 
   async function getLocation() {
     if (!navigator.geolocation) {
