@@ -32,6 +32,8 @@ type PinType = {
 
   user_id: string;
 
+  pin_type?: string;
+
   song_title: string;
   artist_name: string;
   story: string;
@@ -76,6 +78,8 @@ export default function Home() {
   const [isCreatingPin, setIsCreatingPin] = useState(false);
 
   const [selectedPin, setSelectedPin] = useState<PinType | null>(null);
+
+  const [selectedPinType, setSelectedPinType] = useState<string | null>(null);
 
   useEffect(() => {
     checkUser();
@@ -198,6 +202,8 @@ export default function Home() {
       const pinData = {
         user_id: user.id,
 
+        pin_type: selectedPinType,
+
         user_name: user.name || "",
 
         user_avatar: user.avatar || "",
@@ -270,10 +276,25 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-black text-white p-4 md:p-6">
+    <main className="h-screen w-screen overflow-hidden bg-black text-white">
       {!user ? (
         <div className="max-w-md mx-auto pt-20">
-          <div className="bg-zinc-900 p-8 rounded-2xl space-y-6">
+          <div
+            className="
+    absolute
+    top-4
+    left-4
+    z-[3000]
+    bg-black/45
+    backdrop-blur-md
+    border
+    border-white/10
+    rounded-2xl
+    px-3
+    py-2
+    shadow-xl
+  "
+          >
             <h1 className="text-3xl font-bold">Music Map</h1>
 
             <button
@@ -285,12 +306,24 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="relative h-full w-full">
           <div>
-            <div className="bg-zinc-900 rounded-2xl p-6 h-full">
-              <h2 className="text-2xl font-bold mb-4">Music Map</h2>
-
-              <div className="flex items-center gap-3 mb-6">
+            <div
+              className="
+    absolute
+    top-4
+    left-4
+    z-[3000]
+    w-[260px]
+    max-w-[calc(100vw-32px)]
+    rounded-xl
+    bg-zinc-900/85
+    backdrop-blur-xl
+    p-3
+    shadow-2xl
+  "
+            >
+              <div className="flex items-center gap-3">
                 {user.avatar && (
                   <img
                     src={user.avatar}
@@ -301,41 +334,83 @@ export default function Home() {
 
                 <div className="flex-1">
                   <p className="font-semibold">{user.name || user.email}</p>
-
-                  <p className="text-xs text-zinc-400">Logged in</p>
                 </div>
 
                 <button
                   onClick={() => signOut(auth)}
-                  className="text-sm bg-zinc-800 px-3 py-2 rounded-xl"
+                  className="
+    text-xs
+    text-zinc-400
+    hover:text-white
+    transition
+  "
                 >
-                  Logout
+                  logout
                 </button>
-              </div>
-
-              <div className="text-zinc-400 space-y-3">
-                <p>Click anywhere on the map to create a music memory.</p>
-
-                <p>Select pins to explore stories from other people.</p>
               </div>
             </div>
           </div>
 
-          <div className="lg:col-span-2 space-y-6">
-            <div
-              className="
-                relative
-                h-[68vh]
-                min-h-[630px]
-                rounded-2xl
-                overflow-hidden
-              "
-            >
+          <div className="h-full w-full">
+            <div className="h-full w-full">
+              <div
+                className="
+    absolute
+    left-3
+    top-1/2
+    -translate-y-1/2
+    z-[4000]
+    flex
+    flex-col
+    gap-2
+    rounded-2xl
+    bg-black/55
+    backdrop-blur-xl
+    border
+    border-white/10
+    p-2
+  "
+              >
+                {[
+                  { type: "music", icon: "🎵" },
+                  { type: "concert", icon: "🎤" },
+                  { type: "roadtrip", icon: "🚗" },
+                  { type: "camping", icon: "⛺" },
+                  { type: "night", icon: "🌙" },
+                  { type: "summer", icon: "☀️" },
+                  { type: "person", icon: "👤" },
+                ].map((item) => (
+                  <button
+                    key={item.type}
+                    onClick={() =>
+                      setSelectedPinType(
+                        selectedPinType === item.type ? null : item.type,
+                      )
+                    }
+                    className={`
+        w-11
+        h-11
+        rounded-xl
+        text-xl
+        transition-all
+        ${
+          selectedPinType === item.type
+            ? "bg-white text-black scale-110"
+            : "bg-zinc-800/80"
+        }
+      `}
+                  >
+                    {item.icon}
+                  </button>
+                ))}
+              </div>
               <Map
                 pins={pins.filter(
                   (pin) => pin.latitude !== null && pin.longitude !== null,
                 )}
                 toggleLike={toggleLike}
+                selectedPinType={selectedPinType}
+                setSelectedPinType={setSelectedPinType}
                 selectedPin={selectedPin}
                 setSelectedPin={setSelectedPin}
                 currentUserId={user.id}
@@ -363,6 +438,22 @@ export default function Home() {
                 setSelectedLng={setSelectedLng}
                 setIsCreatingPin={setIsCreatingPin}
               />
+
+              <div
+                className="
+    absolute
+    bottom-5
+    left-1/2
+    -translate-x-1/2
+    z-[2500]
+    text-xs
+    text-white/40
+    tracking-wide
+    pointer-events-none
+  "
+              >
+                tap map to create memory
+              </div>
 
               {isCreatingPin && (
                 <div

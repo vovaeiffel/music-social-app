@@ -43,7 +43,11 @@ type PinType = {
 type Props = {
   pins: PinType[];
 
+  setSelectedPinType: (type: string | null) => void;
+
   toggleLike: (pinId: string, liked: boolean) => void;
+
+  selectedPinType: string | null;
 
   selectedPin: PinType | null;
 
@@ -66,11 +70,11 @@ type Props = {
 };
 
 function MapClickHandler({
-  selectedPin,
   setSelectedPin,
   setSelectedLat,
   setSelectedLng,
   setIsCreatingPin,
+  selectedPinType,
 }: {
   setSelectedLat: (lat: number) => void;
 
@@ -78,12 +82,13 @@ function MapClickHandler({
 
   setIsCreatingPin: (value: boolean) => void;
 
-  selectedPin: PinType | null;
+  selectedPinType: string | null;
 
   setSelectedPin: (pin: PinType | null) => void;
 }) {
   useMapEvents({
     click(e) {
+      if (!selectedPinType) return;
       setSelectedPin(null);
 
       setSelectedLat(e.latlng.lat);
@@ -168,6 +173,8 @@ function SelectedPinOverlay({
     y: 0,
   });
 
+  const [zoomScale, setZoomScale] = useState(1);
+
   useEffect(() => {
     if (!pin) return;
 
@@ -178,6 +185,18 @@ function SelectedPinOverlay({
         x: point.x,
         y: point.y,
       });
+      const zoom = map.getZoom();
+
+      /*
+        3   -> 0.45
+        6   -> 0.65
+        10  -> 1
+        15  -> 1.45
+      */
+
+      const scale = 0.25 + zoom * 0.08;
+
+      setZoomScale(scale);
     }
 
     updatePosition();
@@ -198,31 +217,31 @@ function SelectedPinOverlay({
     <motion.div
       initial={{
         opacity: 0,
-        scale: 0.9,
+        scale: zoomScale * 0.85,
         y: 20,
       }}
       animate={{
         opacity: 1,
-        scale: 1,
+        scale: zoomScale,
         y: 0,
       }}
       exit={{
         opacity: 0,
-        scale: 0.95,
+        scale: zoomScale * 0.9,
         y: 10,
       }}
       transition={{
-        duration: 0.2,
+        duration: 0.25,
+        ease: "easeOut",
       }}
       className="
-        absolute
-        z-[2000]
-        pointer-events-none
-      "
+    absolute
+    z-[2000]
+    pointer-events-none
+  "
       style={{
-        left: position.x,
-        top: position.y - 20,
-        transform: "translate(-50%, -100%)",
+        left: position.x - 110,
+        top: position.y - 170,
       }}
     >
       <div
@@ -236,17 +255,18 @@ function SelectedPinOverlay({
         onMouseDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
         className="
-    w-[340px]
-max-w-[92vw]
-md:w-[320px]
-    rounded-2xl
-    bg-zinc-900/95
-          backdrop-blur
-          shadow-2xl
-          p-4
-          text-white
-          pointer-events-auto
-        "
+        w-[230px]
+        max-w-[70vw]
+        rounded-2xl
+        bg-black/70
+        backdrop-blur-2xl
+        border
+        border-white/10
+        shadow-2xl
+        p-3
+        text-white
+        pointer-events-auto
+      "
       >
         <div
           className="
@@ -256,11 +276,29 @@ md:w-[320px]
             mb-3
           "
         >
+          <div className="flex items-center gap-2 mb-3">
+            {pin.user_avatar && (
+              <img
+                src={pin.user_avatar}
+                alt="avatar"
+                className="w-7 h-7 rounded-full"
+              />
+            )}
+
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate">
+                {pin.user_name || "Unknown"}
+              </p>
+
+              <p className="text-[11px] text-white/40">music memory</p>
+            </div>
+          </div>
+
           <div>
             <h2
               className="
-                text-xl
-                font-bold
+               text-base
+font-semibold
               "
             >
               {pin.song_title}
@@ -282,7 +320,7 @@ md:w-[320px]
               onClose();
             }}
             className="
-              text-zinc-400
+              text-white/50 text-sm
               hover:text-white
             "
           >
@@ -292,9 +330,10 @@ md:w-[320px]
 
         <p
           className="
-            text-sm
-            mb-4
-            leading-relaxed
+            text-[13px]
+leading-relaxed
+text-white/80
+mb-4
           "
         >
           {pin.story}
@@ -303,7 +342,7 @@ md:w-[320px]
         {pin.youtube_url && (
           <iframe
             width="100%"
-            height="180"
+            height="160"
             src={pin.youtube_url?.replace("watch?v=", "embed/")}
             title="YouTube player"
             allowFullScreen
@@ -312,21 +351,44 @@ md:w-[320px]
         )}
 
         {pin.spotify_url && (
-          <iframe
-            src={pin.spotify_url.replace(
-              "open.spotify.com/track/",
-              "open.spotify.com/embed/track/",
-            )}
-            width="100%"
-            height="152"
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-            loading="lazy"
+          <div className="mt-3 w-full overflow-hidden rounded-xl">
+            <div className="origin-top-left scale-[0.88]">
+              <iframe
+                src={pin.spotify_url.replace(
+                  "open.spotify.com/track/",
+                  "open.spotify.com/embed/track/",
+                )}
+                width="114%"
+                height="110"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+                className="block border-0"
+              />
+            </div>
+          </div>
+        )}
+
+        {pin.yandex_url && (
+          <a
+            href={pin.yandex_url}
+            target="_blank"
+            rel="noopener noreferrer"
             className="
+      mt-3
+      flex
+      items-center
+      justify-center
       rounded-xl
-      border-0
-      mt-4
+      bg-red-500/90
+      hover:bg-red-500
+      transition
+      py-2
+      text-sm
+      font-medium
     "
-          />
+          >
+            Open in Yandex Music
+          </a>
         )}
 
         <div
@@ -399,6 +461,8 @@ export default function Map({
   currentUserId,
   onEditPin,
   onDeletePin,
+  selectedPinType,
+  setSelectedPinType,
   selectedLat,
   selectedLng,
   setSelectedLat,
@@ -436,12 +500,11 @@ export default function Map({
         scrollWheelZoom={true}
         preferCanvas={true}
         style={{
-          height: "100%",
+          height: "100vh",
           width: "100%",
         }}
         attributionControl={false}
       >
-        <ResizeMap />
         <SaveMapPosition />
         <FlyToPin pin={selectedPin} />
         <SelectedPinOverlay
@@ -458,11 +521,11 @@ export default function Map({
         />
 
         <MapClickHandler
-          selectedPin={selectedPin}
           setSelectedPin={setSelectedPin}
           setSelectedLat={setSelectedLat}
           setSelectedLng={setSelectedLng}
           setIsCreatingPin={setIsCreatingPin}
+          selectedPinType={selectedPinType}
         />
 
         {selectedLat !== null && selectedLng !== null && (
