@@ -2,6 +2,17 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import ProfilePanel from "./components/profile/ProfilePanel";
+import ProfileOverlay from "./components/overlays/ProfileOverlay";
+import { useCreatePinStore } from "@/app/store/createPinStore";
+import { loadPins } from "@/app/services/pinsService";
+import {
+  createUserIfNotExists,
+  getUserProfile,
+} from "@/app/services/userService";
+
+import type { PinType } from "@/app/types/pin";
+import { usePinStore } from "@/app/store/pinStore";
 
 import { auth, provider, db } from "@/lib/firebase";
 
@@ -10,7 +21,6 @@ import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 import {
   collection,
   addDoc,
-  getDocs,
   deleteDoc,
   doc,
   updateDoc,
@@ -27,67 +37,71 @@ type UserType = {
   avatar?: string;
 };
 
-type PinType = {
-  id: string;
-
-  user_id: string;
-
-  pin_type?: string;
-
-  song_title: string;
-  artist_name: string;
-  story: string;
-  place_name: string;
-
-  latitude: number;
-  longitude: number;
-
-  user_name?: string;
-  user_avatar?: string;
-
-  youtube_url?: string;
-  spotify_url?: string;
-  yandex_url?: string;
-
-  likes_count?: number;
-  liked_by_user?: boolean;
-};
-
 export default function Home() {
+  const {
+    songTitle,
+    setSongTitle,
+
+    artistName,
+    setArtistName,
+
+    story,
+    setStory,
+
+    placeName,
+    setPlaceName,
+
+    youtubeUrl,
+    setYoutubeUrl,
+
+    spotifyUrl,
+    setSpotifyUrl,
+
+    yandexUrl,
+    setYandexUrl,
+
+    selectedLat,
+    setSelectedLat,
+
+    selectedLng,
+    setSelectedLng,
+
+    editingPinId,
+    setEditingPinId,
+
+    setIsCreatingPin,
+
+    selectedPinType,
+    setSelectedPinType,
+
+    resetForm,
+  } = useCreatePinStore();
+
   const [user, setUser] = useState<UserType | null>(null);
 
   const [loading, setLoading] = useState(true);
 
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const [isProfileOverlayOpen, setIsProfileOverlayOpen] = useState(false);
+
   const [pins, setPins] = useState<PinType[]>([]);
 
-  const [songTitle, setSongTitle] = useState("");
-  const [artistName, setArtistName] = useState("");
-  const [story, setStory] = useState("");
-  const [placeName, setPlaceName] = useState("");
+  const selectedPin = usePinStore((state) => state.selectedPin);
 
-  const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [spotifyUrl, setSpotifyUrl] = useState("");
-  const [yandexUrl, setYandexUrl] = useState("");
+  const setSelectedPin = usePinStore((state) => state.setSelectedPin);
 
-  const [selectedLat, setSelectedLat] = useState<number | null>(null);
+  const loadPinsData = async () => {
+    try {
+      const loadedPins = await loadPins();
 
-  const [selectedLng, setSelectedLng] = useState<number | null>(null);
+      setPins(loadedPins);
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-  const [editingPinId, setEditingPinId] = useState<string | null>(null);
-
-  const [isCreatingPin, setIsCreatingPin] = useState(false);
-
-  const [selectedPin, setSelectedPin] = useState<PinType | null>(null);
-
-  const [selectedPinType, setSelectedPinType] = useState<string | null>(null);
-
-  useEffect(() => {
-    checkUser();
-    loadPins();
-    getLocation();
-  }, []);
-
-  async function getLocation() {
+  const getLocation = () => {
     if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition(
@@ -99,53 +113,59 @@ export default function Home() {
         console.error(error);
       },
     );
-  }
+  };
 
-  function checkUser() {
-    onAuthStateChanged(auth, (firebaseUser) => {
+  const checkUser = () => {
+    return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        await createUserIfNotExists({
+          id: firebaseUser.uid,
+
+          name: firebaseUser.displayName || "",
+
+          avatar: firebaseUser.photoURL || "",
+        });
+
         setUser({
           id: firebaseUser.uid,
           email: firebaseUser.email || "",
           name: firebaseUser.displayName || "",
           avatar: firebaseUser.photoURL || "",
         });
+
+        const profileData = await getUserProfile(firebaseUser.uid);
+
+        setProfile(profileData);
       } else {
         setUser(null);
       }
 
       setLoading(false);
     });
-  }
+  };
 
-  async function signInWithGoogle() {
+  const signInWithGoogle = async () => {
     try {
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error(error);
     }
-  }
+  };
 
-  async function loadPins() {
-    try {
-      const querySnapshot = await getDocs(collection(db, "pins"));
+  const [profile, setProfile] = useState<any>(null);
 
-      const loadedPins: PinType[] = [];
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const unsubscribe = checkUser();
 
-      querySnapshot.forEach((document) => {
-        loadedPins.push({
-          id: document.id,
-          ...(document.data() as Omit<PinType, "id">),
-        });
-      });
+    loadPinsData();
+    getLocation();
 
-      setPins(loadedPins);
-    } catch (error) {
-      console.error(error);
-    }
-  }
+    return () => unsubscribe();
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  async function toggleLike(pinId: string, liked: boolean) {
+  const toggleLike = async (pinId: string, liked: boolean) => {
     const updatedPins = pins.map((pin) => {
       if (pin.id !== pinId) return pin;
 
@@ -169,23 +189,21 @@ export default function Home() {
           : (selectedPin.likes_count || 0) + 1,
       });
     }
-  }
+  };
 
-  async function deletePin(pinId: string) {
+  const deletePin = async (pinId: string) => {
     try {
       await deleteDoc(doc(db, "pins", pinId));
 
-      await loadPins();
-
-      setSelectedPin(null);
+      await loadPinsData();
     } catch (error) {
       console.error(error);
 
       alert("Error deleting pin");
     }
-  }
+  };
 
-  async function createPin() {
+  const createPin = async () => {
     if (!user) return;
 
     if (selectedLat === null || selectedLng === null) {
@@ -222,6 +240,18 @@ export default function Home() {
 
         yandex_url: yandexUrl,
 
+        music_links: [
+          ...(youtubeUrl
+            ? [{ type: "youtube" as const, url: youtubeUrl }]
+            : []),
+
+          ...(spotifyUrl
+            ? [{ type: "spotify" as const, url: spotifyUrl }]
+            : []),
+
+          ...(yandexUrl ? [{ type: "yandex" as const, url: yandexUrl }] : []),
+        ],
+
         latitude: selectedLat,
 
         longitude: selectedLng,
@@ -243,29 +273,15 @@ export default function Home() {
         alert("Pin created!");
       }
 
-      await loadPins();
+      await loadPinsData();
 
-      setSongTitle("");
-      setArtistName("");
-      setStory("");
-      setPlaceName("");
-
-      setYoutubeUrl("");
-      setSpotifyUrl("");
-      setYandexUrl("");
-
-      setSelectedLat(null);
-      setSelectedLng(null);
-
-      setEditingPinId(null);
-
-      setIsCreatingPin(false);
+      resetForm();
     } catch (error) {
       console.error(error);
 
       alert("Error creating pin");
     }
-  }
+  };
 
   if (loading) {
     return (
@@ -277,98 +293,36 @@ export default function Home() {
 
   return (
     <main className="h-screen w-screen overflow-hidden bg-black text-white">
-      {!user ? (
-        <div className="max-w-md mx-auto pt-20">
-          <div
-            className="
-    absolute
-    top-4
-    left-4
-    z-[3000]
-    bg-black/45
-    backdrop-blur-md
-    border
-    border-white/10
-    rounded-2xl
-    px-3
-    py-2
-    shadow-xl
-  "
-          >
-            <h1 className="text-3xl font-bold">Music Map</h1>
-
-            <button
-              onClick={signInWithGoogle}
-              className="w-full bg-white text-black p-3 rounded-xl font-semibold"
-            >
-              Sign in with Google
-            </button>
-          </div>
-        </div>
-      ) : (
+      {user ? (
+        // PROFILE PANEL
         <div className="relative h-full w-full">
-          <div>
-            <div
-              className="
-    absolute
-    top-4
-    left-4
-    z-[3000]
-    w-[260px]
-    max-w-[calc(100vw-32px)]
-    rounded-xl
-    bg-zinc-900/85
-    backdrop-blur-xl
-    p-3
-    shadow-2xl
-  "
-            >
-              <div className="flex items-center gap-3">
-                {user.avatar && (
-                  <img
-                    src={user.avatar}
-                    alt="avatar"
-                    className="w-10 h-10 rounded-full"
-                  />
-                )}
-
-                <div className="flex-1">
-                  <p className="font-semibold">{user.name || user.email}</p>
-                </div>
-
-                <button
-                  onClick={() => signOut(auth)}
-                  className="
-    text-xs
-    text-zinc-400
-    hover:text-white
-    transition
-  "
-                >
-                  logout
-                </button>
-              </div>
-            </div>
-          </div>
+          <ProfilePanel
+            profile={profile}
+            user={user}
+            pins={pins}
+            setSelectedPin={setSelectedPin}
+            onLogout={() => signOut(auth)}
+            onOpenSettings={() => setIsProfileOverlayOpen(true)}
+            isProfileOpen={isProfileOpen}
+            setIsProfileOpen={setIsProfileOpen}
+            openProfileOverlay={() => setIsProfileOverlayOpen(true)}
+          />
 
           <div className="h-full w-full">
             <div className="h-full w-full">
               <div
                 className="
     absolute
-    left-3
-    top-1/2
-    -translate-y-1/2
+    left-2
+    bottom-24
+    md:top-1/2
+    md:bottom-auto
+    md:-translate-y-1/2
     z-[4000]
     flex
-    flex-col
+    flex-row
+    md:flex-col
     gap-2
-    rounded-2xl
-    bg-black/55
-    backdrop-blur-xl
-    border
-    border-white/10
-    p-2
   "
               >
                 {[
@@ -390,13 +344,15 @@ export default function Home() {
                     className={`
         w-11
         h-11
-        rounded-xl
+        rounded-full
         text-xl
+        backdrop-blur-md
         transition-all
+        duration-200
         ${
           selectedPinType === item.type
             ? "bg-white text-black scale-110"
-            : "bg-zinc-800/80"
+            : "bg-black/45 text-white hover:bg-black/70"
         }
       `}
                   >
@@ -404,15 +360,20 @@ export default function Home() {
                   </button>
                 ))}
               </div>
+              {isProfileOverlayOpen && user && (
+                <ProfileOverlay
+                  user={user}
+                  profile={profile}
+                  setProfile={setProfile}
+                  onClose={() => setIsProfileOverlayOpen(false)}
+                />
+              )}
               <Map
+                createPin={createPin}
                 pins={pins.filter(
                   (pin) => pin.latitude !== null && pin.longitude !== null,
                 )}
                 toggleLike={toggleLike}
-                selectedPinType={selectedPinType}
-                setSelectedPinType={setSelectedPinType}
-                selectedPin={selectedPin}
-                setSelectedPin={setSelectedPin}
                 currentUserId={user.id}
                 onEditPin={(pin) => {
                   setEditingPinId(pin.id);
@@ -423,7 +384,9 @@ export default function Home() {
                   setPlaceName(pin.place_name || "");
 
                   setYoutubeUrl(pin.youtube_url || "");
+
                   setSpotifyUrl(pin.spotify_url || "");
+
                   setYandexUrl(pin.yandex_url || "");
 
                   setSelectedLat(pin.latitude);
@@ -432,11 +395,6 @@ export default function Home() {
                   setIsCreatingPin(true);
                 }}
                 onDeletePin={deletePin}
-                selectedLat={selectedLat}
-                selectedLng={selectedLng}
-                setSelectedLat={setSelectedLat}
-                setSelectedLng={setSelectedLng}
-                setIsCreatingPin={setIsCreatingPin}
               />
 
               <div
@@ -454,121 +412,42 @@ export default function Home() {
               >
                 tap map to create memory
               </div>
-
-              {isCreatingPin && (
-                <div
-                  className="
-                    absolute
-                    top-3
-                    left-4
-                    z-[1000]
-                    w-full
-                    max-w-sm
-                    bg-zinc-900/95
-                    backdrop-blur
-                    rounded-2xl
-                    p-4
-                    shadow-2xl
-                    space-y-3
-                    max-h-[95%]
-                    overflow-y-auto
-                  "
-                >
-                  <h2 className="text-xl font-bold">
-                    {editingPinId ? "Edit Pin" : "Create Pin"}
-                  </h2>
-
-                  <input
-                    type="text"
-                    placeholder="Song title"
-                    value={songTitle}
-                    onChange={(e) => setSongTitle(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-zinc-800"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Artist"
-                    value={artistName}
-                    onChange={(e) => setArtistName(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-zinc-800"
-                  />
-
-                  <textarea
-                    placeholder="Your story"
-                    value={story}
-                    onChange={(e) => setStory(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-zinc-800 h-20"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Place"
-                    value={placeName}
-                    onChange={(e) => setPlaceName(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-zinc-800"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="YouTube link"
-                    value={youtubeUrl}
-                    onChange={(e) => setYoutubeUrl(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-zinc-800"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Spotify link"
-                    value={spotifyUrl}
-                    onChange={(e) => setSpotifyUrl(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-zinc-800"
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Yandex Music link"
-                    value={yandexUrl}
-                    onChange={(e) => setYandexUrl(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-zinc-800"
-                  />
-
-                  <div className="flex gap-3">
-                    <button
-                      onClick={createPin}
-                      className="
-                        flex-1
-                        bg-white
-                        text-black
-                        p-3
-                        rounded-xl
-                        font-semibold
-                      "
-                    >
-                      {editingPinId ? "Save" : "Create"}
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setIsCreatingPin(false);
-
-                        setEditingPinId(null);
-
-                        setSelectedLat(null);
-                        setSelectedLng(null);
-                      }}
-                      className="
-                        px-4
-                        rounded-xl
-                        bg-zinc-700
-                      "
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-md mx-auto pt-20">
+          <div
+            className="
+            absolute
+top-4
+left-4
+z-[9999]
+            bg-black/45
+            backdrop-blur-md
+            border
+            border-white/10
+            rounded-2xl
+            px-3
+            py-2
+            shadow-xl
+          "
+          >
+            <h1 className="text-3xl font-bold mb-4">Music Map</h1>
+
+            <button
+              onClick={signInWithGoogle}
+              className="
+              w-full
+              bg-white
+              text-black
+              p-3
+              rounded-xl
+              font-semibold
+            "
+            >
+              Sign in with Google
+            </button>
           </div>
         </div>
       )}

@@ -1,47 +1,103 @@
 import L from "leaflet";
 
-export const customIcon = new L.DivIcon({
-  html: `
-    <div
-      style="
-        width: 34px;
-        height: 34px;
-        border-radius: 999px;
-        background: #18181b;
-        border: 2px solid white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 16px;
-        box-shadow: 0 0 15px rgba(255,255,255,0.25);
-      "
-    >
-      🎵
-    </div>
-  `,
-  className: "",
-  iconSize: [34, 34],
-  iconAnchor: [17, 17],
-});
+function createEmojiIcon(emoji: string, active = false) {
+  return L.divIcon({
+    className: "",
+    html: `
+      <div
+        style="
+          width:${active ? 52 : 42}px;
+          height:${active ? 52 : 42}px;
 
-export const activeIcon = L.divIcon({
-  className: "custom-marker",
+          border-radius:999px;
 
-  html: `
-  <div
-    style="
-      width: 22px;
-      height: 22px;
-      border-radius: 999px;
-      background: #ffffff;
-      border: 4px solid #ef4444;
-      box-shadow:
-        0 0 0 6px rgba(239,68,68,0.25),
-        0 0 24px rgba(239,68,68,0.6);
-    "
-  ></div>
-`,
+          background:${active ? "white" : "rgba(0,0,0,0.75)"};
 
-  iconSize: [22, 22],
-  iconAnchor: [11, 11],
-});
+          border:1px solid rgba(255,255,255,0.15);
+
+          display:flex;
+          align-items:center;
+          justify-content:center;
+
+          font-size:${active ? 26 : 22}px;
+
+          box-shadow:
+            0 10px 30px rgba(0,0,0,0.35);
+
+          transition:all .2s ease;
+        "
+      >
+        ${emoji}
+      </div>
+    `,
+    iconSize: active ? [52, 52] : [42, 42],
+    iconAnchor: active ? [26, 26] : [21, 21],
+    popupAnchor: [0, -20],
+  });
+}
+
+export const musicIcon = createEmojiIcon("🎵");
+export const concertIcon = createEmojiIcon("🎤");
+export const roadtripIcon = createEmojiIcon("🚗");
+export const campingIcon = createEmojiIcon("⛺");
+export const nightIcon = createEmojiIcon("🌙");
+export const summerIcon = createEmojiIcon("☀️");
+export const personIcon = createEmojiIcon("👤");
+
+export const activeMusicIcon = createEmojiIcon("🎵", true);
+export const activeConcertIcon = createEmojiIcon("🎤", true);
+export const activeRoadtripIcon = createEmojiIcon("🚗", true);
+export const activeCampingIcon = createEmojiIcon("⛺", true);
+export const activeNightIcon = createEmojiIcon("🌙", true);
+export const activeSummerIcon = createEmojiIcon("☀️", true);
+export const activePersonIcon = createEmojiIcon("👤", true);
+
+export function getPinIcon(type?: string) {
+  switch (type) {
+    case "concert":
+      return concertIcon;
+
+    case "roadtrip":
+      return roadtripIcon;
+
+    case "camping":
+      return campingIcon;
+
+    case "night":
+      return nightIcon;
+
+    case "summer":
+      return summerIcon;
+
+    case "person":
+      return personIcon;
+
+    default:
+      return musicIcon;
+  }
+}
+
+export function getActivePinIcon(type?: string) {
+  switch (type) {
+    case "concert":
+      return activeConcertIcon;
+
+    case "roadtrip":
+      return activeRoadtripIcon;
+
+    case "camping":
+      return activeCampingIcon;
+
+    case "night":
+      return activeNightIcon;
+
+    case "summer":
+      return activeSummerIcon;
+
+    case "person":
+      return activePersonIcon;
+
+    default:
+      return activeMusicIcon;
+  }
+}
