@@ -1,3 +1,8 @@
+export type MusicLinkType = {
+  type: "youtube" | "spotify" | "yandex";
+  url: string;
+};
+
 export type PinType = {
   id: string;
 
@@ -16,8 +21,11 @@ export type PinType = {
   user_name?: string;
   user_avatar?: string;
 
-  music_url?: string;
-  music_platform?: "youtube" | "spotify" | "yandex";
+  youtube_url?: string;
+  spotify_url?: string;
+  yandex_url?: string;
+
+  music_links?: MusicLinkType[];
 
   likes_count?: number;
   liked_by_user?: boolean;
