@@ -3,6 +3,8 @@ export type UserProfileType = {
 
   username: string;
 
+  user_tag?: string;
+
   display_name: string;
 
   bio: string;
