@@ -101,14 +101,16 @@ export async function updateUserProfile({
 
 // ================= PROFILE =================
 
-export async function getUserProfile(id: string) {
+export async function getUserProfile(
+  id: string,
+): Promise<UserProfileType | null> {
   const userRef = doc(db, "users", id);
 
   const userSnap = await getDoc(userRef);
 
   if (!userSnap.exists()) return null;
 
-  const data = userSnap.data();
+  const data = userSnap.data() as UserProfileType;
 
   if (!data.user_tag) {
     const userTag = id.slice(-5).toUpperCase();

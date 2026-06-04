@@ -11,6 +11,12 @@ import {
   getUserProfile,
 } from "@/app/services/userService";
 
+import { increment } from "firebase/firestore";
+
+import { likePin, unlikePin, getUserLikes } from "@/app/services/likeService";
+
+import type { UserProfileType } from "@/app/types/user";
+
 import type { PinType } from "@/app/types/pin";
 import { usePinStore } from "@/app/store/pinStore";
 
@@ -95,7 +101,21 @@ export default function Home() {
     try {
       const loadedPins = await loadPins();
 
-      setPins(loadedPins);
+      if (!user) {
+        setPins(loadedPins);
+        return;
+      }
+
+      const likedPinIds = await getUserLikes(user.id);
+
+      console.log("LIKED PINS", likedPinIds);
+
+      const pinsWithLikes = loadedPins.map((pin) => ({
+        ...pin,
+        liked_by_user: likedPinIds.includes(pin.id),
+      }));
+
+      setPins(pinsWithLikes);
     } catch (error) {
       console.error(error);
     }
@@ -152,42 +172,64 @@ export default function Home() {
     }
   };
 
-  const [profile, setProfile] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfileType | null>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const unsubscribe = checkUser();
 
-    loadPinsData();
     getLocation();
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    loadPinsData();
+  }, [user]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const toggleLike = async (pinId: string, liked: boolean) => {
-    const updatedPins = pins.map((pin) => {
-      if (pin.id !== pinId) return pin;
+    if (!user) return;
 
-      return {
-        ...pin,
-        liked_by_user: !liked,
-        likes_count: liked
-          ? (pin.likes_count || 1) - 1
-          : (pin.likes_count || 0) + 1,
-      };
+    console.log("TOGGLE", {
+      pinId,
+      liked,
     });
+    try {
+      if (liked) {
+        await unlikePin(user.id, pinId);
+        await updateDoc(doc(db, "pins", pinId), {
+          likes_count: increment(-1),
+        });
+      } else {
+        await likePin(user.id, pinId);
+      }
 
-    setPins(updatedPins);
+      const updatedPins = pins.map((pin) => {
+        if (pin.id !== pinId) return pin;
 
-    if (selectedPin?.id === pinId) {
-      setSelectedPin({
-        ...selectedPin,
-        liked_by_user: !liked,
-        likes_count: liked
-          ? (selectedPin.likes_count || 1) - 1
-          : (selectedPin.likes_count || 0) + 1,
+        return {
+          ...pin,
+          liked_by_user: !liked,
+          likes_count: liked
+            ? (pin.likes_count || 1) - 1
+            : (pin.likes_count || 0) + 1,
+        };
       });
+
+      setPins(updatedPins);
+
+      if (selectedPin?.id === pinId) {
+        setSelectedPin({
+          ...selectedPin,
+          liked_by_user: !liked,
+          likes_count: liked
+            ? (selectedPin.likes_count || 1) - 1
+            : (selectedPin.likes_count || 0) + 1,
+        });
+      }
+    } catch (error) {
+      console.error(error);
     }
   };
 

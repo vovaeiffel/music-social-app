@@ -72,6 +72,12 @@ function SelectedPinOverlay({
     map.on("move", updatePosition);
     map.on("zoom", updatePosition);
 
+    console.log("PIN LIKED STATE", {
+      id: pin.id,
+      liked_by_user: pin.liked_by_user,
+      likes_count: pin.likes_count,
+    });
+
     return () => {
       map.off("move", updatePosition);
 

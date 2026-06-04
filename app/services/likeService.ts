@@ -1,6 +1,15 @@
 import { db } from "@/lib/firebase";
 
-import { doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  deleteDoc,
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+} from "firebase/firestore";
 
 export type LikeType = {
   user_id: string;
@@ -30,4 +39,15 @@ export async function isPinLiked(userId: string, pinId: string) {
   const snap = await getDoc(doc(db, "likes", likeId));
 
   return snap.exists();
+}
+
+export async function getUserLikes(userId: string) {
+  const likesQuery = query(
+    collection(db, "likes"),
+    where("user_id", "==", userId),
+  );
+
+  const snapshot = await getDocs(likesQuery);
+
+  return snapshot.docs.map((doc) => doc.data().pin_id);
 }
