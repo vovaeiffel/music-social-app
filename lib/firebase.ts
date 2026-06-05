@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
-// Импортируем enableIndexedDbPersistence
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,21 +16,5 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const provider = new GoogleAuthProvider();
 
-// Инициализируем Firestore
+// Инициализируем Firestore в простом виде
 export const db = getFirestore(app);
-
-// Пытаемся включить локальное кэширование, чтобы данные подгружались из памяти,
-// если сеть "отвалилась"
-try {
-  enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code === "failed-precondition") {
-      console.warn(
-        "Multiple tabs open, persistence disabled in secondary tabs.",
-      );
-    } else if (err.code === "unimplemented") {
-      console.warn("Browser doesn't support persistence.");
-    }
-  });
-} catch (e) {
-  console.error(e);
-}
