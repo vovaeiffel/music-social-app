@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
+import SearchBar from "./components/overlays/SearchBar";
 import ProfilePanel from "./components/profile/ProfilePanel";
 import ProfileOverlay from "./components/overlays/ProfileOverlay";
 import UserProfilePanel from "./components/profile/UserProfilePanel";
 import { useCreatePinStore } from "@/app/store/createPinStore";
+import CreatePinOverlay from "./components/overlays/CreatePinOverlay";
 import { loadPins } from "@/app/services/pinsService";
 import {
   createUserIfNotExists,
@@ -13,16 +15,11 @@ import {
 } from "@/app/services/userService";
 
 import { increment } from "firebase/firestore";
-
 import { likePin, unlikePin, getUserLikes } from "@/app/services/likeService";
-
 import type { UserProfileType } from "@/app/types/user";
-
 import type { PinType } from "@/app/types/pin";
 import { usePinStore } from "@/app/store/pinStore";
-
 import { auth, provider, db } from "@/lib/firebase";
-
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
 
 import {
@@ -48,66 +45,53 @@ export default function Home() {
   const {
     songTitle,
     setSongTitle,
-
     artistName,
     setArtistName,
-
     story,
     setStory,
-
     placeName,
     setPlaceName,
-
-    youtubeUrl,
-    setYoutubeUrl,
-
-    spotifyUrl,
-    setSpotifyUrl,
-
-    yandexUrl,
-    setYandexUrl,
-
+    links,
+    setLink,
     selectedLat,
     setSelectedLat,
-
     selectedLng,
     setSelectedLng,
-
     editingPinId,
     setEditingPinId,
-
+    isCreatingPin,
     setIsCreatingPin,
-
     selectedPinType,
-    setSelectedPinType,
-
     resetForm,
   } = useCreatePinStore();
 
   const [user, setUser] = useState<UserType | null>(null);
-
   const [loading, setLoading] = useState(true);
-
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-
   const [isProfileOverlayOpen, setIsProfileOverlayOpen] = useState(false);
-
   const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
-
   const [selectedUserProfile, setSelectedUserProfile] =
     useState<UserProfileType | null>(null);
-
   const [pins, setPins] = useState<PinType[]>([]);
-
+  const [searchPos, setSearchPos] = useState<[number, number] | null>(null);
   const [savedPins, setSavedPins] = useState<PinType[]>([]);
-
   const [isShowingSaved, setIsShowingSaved] = useState(false);
 
   const selectedPin = usePinStore((state) => state.selectedPin);
-
   const setSelectedPin = usePinStore((state) => state.setSelectedPin);
 
-  const loadPinsData = async () => {
+  const handleStartNewPin = () => {
+    resetForm(); // Это очистит все поля: songTitle, artistName, links, story и т.д.
+    setIsCreatingPin(true); // А это откроет форму
+  };
+
+  const [mapMode, setMapMode] = useState<"global" | "personal" | "guest">(
+    "global",
+  );
+  const [profile, setProfile] = useState<UserProfileType | null>(null);
+
+  // Обернули функции в useCallback, чтобы избежать лишних рендеров и ошибок линтера
+  const loadPinsData = useCallback(async () => {
     try {
       const loadedPins = await loadPins();
 
@@ -117,27 +101,21 @@ export default function Home() {
       }
 
       const likedPinIds = await getUserLikes(user.id);
-
-      console.log("LIKED PINS", likedPinIds);
-
       const pinsWithLikes = loadedPins.map((pin) => ({
         ...pin,
         liked_by_user: likedPinIds.includes(pin.id),
       }));
 
       const saved = pinsWithLikes.filter((pin) => pin.liked_by_user);
-
       setSavedPins(saved);
-
       setPins(pinsWithLikes);
     } catch (error) {
       console.error(error);
     }
-  };
+  }, [user]);
 
-  const getLocation = () => {
+  const getLocation = useCallback(() => {
     if (!navigator.geolocation) return;
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setSelectedLat(position.coords.latitude);
@@ -147,16 +125,14 @@ export default function Home() {
         console.error(error);
       },
     );
-  };
+  }, [setSelectedLat, setSelectedLng]);
 
-  const checkUser = () => {
+  const checkUser = useCallback(() => {
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         await createUserIfNotExists({
           id: firebaseUser.uid,
-
           name: firebaseUser.displayName || "",
-
           avatar: firebaseUser.photoURL || "",
         });
 
@@ -168,15 +144,13 @@ export default function Home() {
         });
 
         const profileData = await getUserProfile(firebaseUser.uid);
-
         setProfile(profileData);
       } else {
         setUser(null);
       }
-
       setLoading(false);
     });
-  };
+  }, []);
 
   const signInWithGoogle = async () => {
     try {
@@ -186,43 +160,45 @@ export default function Home() {
     }
   };
 
-  const [profile, setProfile] = useState<UserProfileType | null>(null);
-
-  /* eslint-disable react-hooks/set-state-in-effect */
+  // Эффект полной инициализации при монтировании компонента
   useEffect(() => {
     const unsubscribe = checkUser();
 
-    loadPinsData();
-    getLocation();
+    const initData = async () => {
+      await loadPinsData();
+      getLocation();
+    };
+
+    initData();
 
     return () => unsubscribe();
+    // Убираем лишние зависимости, оставляя только те, которые реально инициализируют приложение
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Этот эффект мы убираем совсем или переписываем строго на смену ID пользователя,
+  // чтобы он не реагировал на обновление самой функции loadPinsData
   useEffect(() => {
-    if (user) {
-      loadPinsData();
+    if (user?.id) {
+      const refreshPins = async () => {
+        await loadPinsData();
+      };
+      refreshPins();
     }
-  }, [user]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+    // Следим ТОЛЬКО за изменением ID пользователя, а не за инстансом функции
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const toggleLike = async (pinId: string, liked: boolean) => {
     if (!user) return;
-
-    console.log("TOGGLE", {
-      pinId,
-      liked,
-    });
-
     try {
       if (liked) {
         await unlikePin(user.id, pinId);
-
         await updateDoc(doc(db, "pins", pinId), {
           likes_count: increment(-1),
         });
       } else {
         await likePin(user.id, pinId);
-
         await updateDoc(doc(db, "pins", pinId), {
           likes_count: increment(1),
         });
@@ -230,7 +206,6 @@ export default function Home() {
 
       const updatedPins = pins.map((pin) => {
         if (pin.id !== pinId) return pin;
-
         return {
           ...pin,
           liked_by_user: !liked,
@@ -259,11 +234,9 @@ export default function Home() {
   const deletePin = async (pinId: string) => {
     try {
       await deleteDoc(doc(db, "pins", pinId));
-
       await loadPinsData();
     } catch (error) {
       console.error(error);
-
       alert("Error deleting pin");
     }
   };
@@ -281,69 +254,61 @@ export default function Home() {
       return;
     }
 
+    const { visibility, color } = useCreatePinStore.getState();
+    const cleanedLinks = links.filter((link) => link.trim() !== "");
+
+    const buildLegacyMusicLinks = (urls: string[]) => {
+      return urls.map((url) => {
+        const lower = url.toLowerCase();
+        let type: "youtube" | "spotify" | "yandex" = "youtube";
+        if (lower.includes("spotify") || lower.includes("open.spotify"))
+          type = "spotify";
+        if (lower.includes("yandex") || lower.includes("music.yandex"))
+          type = "yandex";
+        return { type, url };
+      });
+    };
+
     try {
       const pinData = {
         user_id: user.id,
-
         pin_type: selectedPinType,
-
+        color: color,
         user_name: user.name || "",
-
         user_avatar: user.avatar || "",
-
         song_title: songTitle,
-
         artist_name: artistName,
-
         story: story,
-
         place_name: placeName,
-
-        youtube_url: youtubeUrl,
-
-        spotify_url: spotifyUrl,
-
-        yandex_url: yandexUrl,
-
-        music_links: [
-          ...(youtubeUrl
-            ? [{ type: "youtube" as const, url: youtubeUrl }]
-            : []),
-
-          ...(spotifyUrl
-            ? [{ type: "spotify" as const, url: spotifyUrl }]
-            : []),
-
-          ...(yandexUrl ? [{ type: "yandex" as const, url: yandexUrl }] : []),
-        ],
-
+        links: cleanedLinks,
+        music_links: buildLegacyMusicLinks(cleanedLinks),
+        youtube_url: cleanedLinks.find((l) => l.includes("youtu")) || "",
+        spotify_url: cleanedLinks.find((l) => l.includes("spotify")) || "",
+        yandex_url: cleanedLinks.find((l) => l.includes("yandex")) || "",
         latitude: selectedLat,
-
         longitude: selectedLng,
-
-        likes_count: 0,
-
-        liked_by_user: false,
-
+        likes_count: editingPinId
+          ? pins.find((p) => p.id === editingPinId)?.likes_count || 0
+          : 0,
+        liked_by_user: editingPinId
+          ? pins.find((p) => p.id === editingPinId)?.liked_by_user || false
+          : false,
         created_at: Date.now(),
+        visibility: visibility,
       };
 
       if (editingPinId) {
         await updateDoc(doc(db, "pins", editingPinId), pinData);
-
         alert("Pin updated!");
       } else {
         await addDoc(collection(db, "pins"), pinData);
-
         alert("Pin created!");
       }
 
       await loadPinsData();
-
       resetForm();
     } catch (error) {
       console.error(error);
-
       alert("Error creating pin");
     }
   };
@@ -359,7 +324,6 @@ export default function Home() {
   return (
     <main className="h-screen w-screen overflow-hidden bg-black text-white">
       {user ? (
-        // PROFILE PANEL
         <div className="relative h-full w-full">
           <ProfilePanel
             savedPins={savedPins}
@@ -374,10 +338,10 @@ export default function Home() {
             isProfileOpen={isProfileOpen}
             setIsProfileOpen={setIsProfileOpen}
             openProfileOverlay={() => setIsProfileOverlayOpen(true)}
-            // ДОБАВЬ ЭТУ СТРОКУ, ЕСЛИ ОНА СЛУЧАЙНО СТЕРЛАСЬ:
             onOpenUserProfile={(prof) => {
               setSelectedUserProfile(prof);
               setIsUserProfileOpen(true);
+              setMapMode("guest");
             }}
           />
 
@@ -389,23 +353,14 @@ export default function Home() {
                 display_name: "Thomas Bangalter",
                 bio: "Electronic music lover",
                 status: "Listening to Homework 🎧",
-                avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Thomas", // генерирует забавную иконку робота
+                avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Thomas",
                 created_at: Date.now(),
                 pins_count: 12,
                 likes_received: 42,
               });
               setIsUserProfileOpen(true);
             }}
-            className="
-    absolute
-    top-80
-    left-4
-    z-[9999]
-    bg-blue-500
-    px-3
-    py-2
-    rounded-xl
-  "
+            className="absolute top-200 left-4 z-9999 bg-blue-500 px-3 py-2 rounded-xl"
           >
             TEST USER PANEL
           </button>
@@ -414,62 +369,18 @@ export default function Home() {
             <UserProfilePanel
               profile={selectedUserProfile}
               currentUserId={user.id}
-              onClose={() => setIsUserProfileOpen(false)}
+              onClose={() => {
+                setIsUserProfileOpen(false);
+                setMapMode("global");
+              }}
+              onVisitMap={() => {
+                setMapMode("guest");
+              }}
             />
           )}
 
           <div className="h-full w-full">
             <div className="h-full w-full">
-              <div
-                className="
-    absolute
-    left-2
-    bottom-24
-    md:top-1/2
-    md:bottom-auto
-    md:-translate-y-1/2
-    z-[4000]
-    flex
-    flex-row
-    md:flex-col
-    gap-2
-  "
-              >
-                {[
-                  { type: "music", icon: "🎵" },
-                  { type: "concert", icon: "🎤" },
-                  { type: "roadtrip", icon: "🚗" },
-                  { type: "camping", icon: "⛺" },
-                  { type: "night", icon: "🌙" },
-                  { type: "summer", icon: "☀️" },
-                  { type: "person", icon: "👤" },
-                ].map((item) => (
-                  <button
-                    key={item.type}
-                    onClick={() =>
-                      setSelectedPinType(
-                        selectedPinType === item.type ? null : item.type,
-                      )
-                    }
-                    className={`
-        w-11
-        h-11
-        rounded-full
-        text-xl
-        backdrop-blur-md
-        transition-all
-        duration-200
-        ${
-          selectedPinType === item.type
-            ? "bg-white text-black scale-110"
-            : "bg-black/45 text-white hover:bg-black/70"
-        }
-      `}
-                  >
-                    {item.icon}
-                  </button>
-                ))}
-              </div>
               {isProfileOverlayOpen && user && (
                 <ProfileOverlay
                   user={user}
@@ -478,55 +389,121 @@ export default function Home() {
                   onClose={() => setIsProfileOverlayOpen(false)}
                 />
               )}
-              <Map
-                createPin={createPin}
-                pins={pins.filter(
-                  (pin) => pin.latitude !== null && pin.longitude !== null,
-                )}
-                toggleLike={toggleLike}
-                currentUserId={user.id}
-                onEditPin={(pin) => {
-                  setEditingPinId(pin.id);
 
-                  setSongTitle(pin.song_title || "");
-                  setArtistName(pin.artist_name || "");
-                  setStory(pin.story || "");
-                  setPlaceName(pin.place_name || "");
+              {/* Контейнер-обертка для управления, который лежит поверх всего */}
+              <div className="absolute top-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-auto z-2000 flex flex-col md:flex-row items-center gap-3">
+                {/* 1. Поиск */}
+                <div className="w-[300px]">
+                  <SearchBar
+                    onSelectLocation={(lat: number, lng: number) =>
+                      setSearchPos([lat, lng])
+                    }
+                  />
+                </div>
 
-                  setYoutubeUrl(pin.youtube_url || "");
+                {/* 2. Кнопки (убираем из них лишний absolute!) */}
+                <div className="flex bg-zinc-900/80 backdrop-blur-md p-1 rounded-2xl border border-white/10 shadow-lg">
+                  <button
+                    onClick={() => setMapMode("global")}
+                    className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
+                      mapMode === "global"
+                        ? "bg-white text-black"
+                        : "text-zinc-400"
+                    }`}
+                  >
+                    🌐 Global Map
+                  </button>
+                  <button
+                    onClick={() => setMapMode("personal")}
+                    className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
+                      mapMode === "personal"
+                        ? "bg-white text-black"
+                        : "text-zinc-400"
+                    }`}
+                  >
+                    🎵 My Muments
+                  </button>
+                </div>
+              </div>
 
-                  setSpotifyUrl(pin.spotify_url || "");
+              <div className="absolute inset-0 z-0">
+                <Map
+                  searchPos={searchPos}
+                  createPin={createPin}
+                  pins={pins.filter((pin) => {
+                    if (pin.latitude === null || pin.longitude === null)
+                      return false;
 
-                  setYandexUrl(pin.yandex_url || "");
+                    if (mapMode === "personal") {
+                      return pin.user_id === user.id;
+                    }
 
-                  setSelectedLat(pin.latitude);
-                  setSelectedLng(pin.longitude);
+                    if (mapMode === "guest") {
+                      return (
+                        pin.user_id === selectedUserProfile?.id &&
+                        (pin.visibility === "global" || !pin.visibility)
+                      );
+                    }
 
-                  setIsCreatingPin(true);
-                }}
-                onDeletePin={deletePin}
-                onOpenUserProfile={async (userId) => {
-                  const profileData = await getUserProfile(userId);
+                    return pin.visibility === "global" || !pin.visibility;
+                  })}
+                  onPrepareNewPin={handleStartNewPin}
+                  toggleLike={toggleLike}
+                  currentUserId={user.id}
+                  onEditPin={(pin) => {
+                    console.log("Редактирование пина с ID:", pin.id);
 
-                  setSelectedUserProfile(profileData);
+                    // 1. Сначала сбрасываем всё в начальное состояние
+                    resetForm();
 
-                  setIsUserProfileOpen(true);
-                }}
-              />
+                    // 2. Устанавливаем ID редактирования
+                    setEditingPinId(pin.id);
 
-              <div
-                className="
-    absolute
-    bottom-5
-    left-1/2
-    -translate-x-1/2
-    z-[2500]
-    text-xs
-    text-white/40
-    tracking-wide
-    pointer-events-none
-  "
-              >
+                    // 3. Заполняем данные из пина
+                    setSongTitle(pin.song_title || "");
+                    setArtistName(pin.artist_name || "");
+                    setStory(pin.story || "");
+                    setPlaceName(pin.place_name || "");
+
+                    // 4. Обработка ссылок
+                    const extendedPin = pin as PinType & { links?: string[] };
+                    const legacyUrls = [
+                      pin.youtube_url,
+                      pin.spotify_url,
+                      pin.yandex_url,
+                    ].filter(Boolean) as string[];
+                    const actualLinks =
+                      extendedPin.links && extendedPin.links.length > 0
+                        ? extendedPin.links
+                        : legacyUrls;
+
+                    actualLinks.forEach((url: string, i: number) => {
+                      setLink(i, url);
+                    });
+
+                    // 5. Координаты и настройки
+                    setSelectedLat(pin.latitude);
+                    setSelectedLng(pin.longitude);
+
+                    const { setVisibility, setColor, setSelectedPinType } =
+                      useCreatePinStore.getState();
+                    setVisibility(pin.visibility || "global");
+                    setColor(pin.color || "#8B5CF6");
+                    setSelectedPinType(pin.pin_type || null);
+
+                    // 6. Финальное открытие формы
+                    setIsCreatingPin(true);
+                  }}
+                  onDeletePin={deletePin}
+                  onOpenUserProfile={async (userId) => {
+                    const profileData = await getUserProfile(userId);
+                    setSelectedUserProfile(profileData);
+                    setIsUserProfileOpen(true);
+                  }}
+                />
+              </div>
+
+              <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-2500 text-xs text-white/40 tracking-wide pointer-events-none">
                 tap map to create memory
               </div>
             </div>
@@ -534,34 +511,11 @@ export default function Home() {
         </div>
       ) : (
         <div className="max-w-md mx-auto pt-20">
-          <div
-            className="
-            absolute
-top-4
-left-4
-z-[9999]
-            bg-black/45
-            backdrop-blur-md
-            border
-            border-white/10
-            rounded-2xl
-            px-3
-            py-2
-            shadow-xl
-          "
-          >
+          <div className="absolute top-4 left-4 z-9999 bg-black/45 backdrop-blur-md border border-white/10 rounded-2xl px-3 py-2 shadow-xl">
             <h1 className="text-3xl font-bold mb-4">Music Map</h1>
-
             <button
               onClick={signInWithGoogle}
-              className="
-              w-full
-              bg-white
-              text-black
-              p-3
-              rounded-xl
-              font-semibold
-            "
+              className="w-full bg-white text-black p-3 rounded-xl font-semibold"
             >
               Sign in with Google
             </button>

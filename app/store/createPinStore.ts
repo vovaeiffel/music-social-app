@@ -13,14 +13,8 @@ type CreatePinStore = {
   placeName: string;
   setPlaceName: (value: string) => void;
 
-  youtubeUrl: string;
-  setYoutubeUrl: (value: string) => void;
-
-  spotifyUrl: string;
-  setSpotifyUrl: (value: string) => void;
-
-  yandexUrl: string;
-  setYandexUrl: (value: string) => void;
+  links: string[];
+  setLink: (index: number, value: string) => void;
 
   selectedLat: number | null;
   setSelectedLat: (lat: number | null) => void;
@@ -36,6 +30,12 @@ type CreatePinStore = {
 
   editingPinId: string | null;
   setEditingPinId: (id: string | null) => void;
+
+  color: string;
+  setColor: (value: string) => void;
+
+  visibility: "global" | "private" | "following";
+  setVisibility: (value: "global" | "private" | "following") => void;
 
   resetForm: () => void;
 };
@@ -53,14 +53,36 @@ export const useCreatePinStore = create<CreatePinStore>((set) => ({
   placeName: "",
   setPlaceName: (value) => set({ placeName: value }),
 
-  youtubeUrl: "",
-  setYoutubeUrl: (value) => set({ youtubeUrl: value }),
+  // Инициализируем массивом с одной пустой строкой
+  links: [""],
 
-  spotifyUrl: "",
-  setSpotifyUrl: (value) => set({ spotifyUrl: value }),
+  setLink: (index, value) =>
+    set((state) => {
+      const newLinks = [...state.links];
+      newLinks[index] = value;
 
-  yandexUrl: "",
-  setYandexUrl: (value) => set({ yandexUrl: value }),
+      // Авто-добавление нового пустого поля:
+      // Если текущее поле не пустое, оно последнее в списке, и мы еще не достигли лимита в 5 ссылок
+      if (
+        value.trim() !== "" &&
+        index === newLinks.length - 1 &&
+        newLinks.length < 5
+      ) {
+        newLinks.push("");
+      }
+
+      // Авто-удаление пустых полей с конца (чтобы не плодить пустые строки, если стерли текст)
+      // Но оставляем хотя бы одно поле, даже если оно пустое
+      while (
+        newLinks.length > 1 &&
+        newLinks[newLinks.length - 1].trim() === "" &&
+        newLinks[newLinks.length - 2].trim() === ""
+      ) {
+        newLinks.pop();
+      }
+
+      return { links: newLinks };
+    }),
 
   selectedLat: null,
   setSelectedLat: (lat) => set({ selectedLat: lat }),
@@ -77,22 +99,25 @@ export const useCreatePinStore = create<CreatePinStore>((set) => ({
   editingPinId: null,
   setEditingPinId: (id) => set({ editingPinId: id }),
 
+  color: "#8B5CF6", // По умолчанию фиолетовый
+  setColor: (value) => set({ color: value }),
+
+  visibility: "global",
+  setVisibility: (value) => set({ visibility: value }),
+
   resetForm: () =>
     set({
       songTitle: "",
       artistName: "",
       story: "",
       placeName: "",
-
-      youtubeUrl: "",
-      spotifyUrl: "",
-      yandexUrl: "",
-
+      links: [""], // Сбрасываем в исходное состояние с одним пустым полем
       selectedLat: null,
       selectedLng: null,
-
       editingPinId: null,
-
       isCreatingPin: false,
+      selectedPinType: null, // ИСПРАВЛЕНО: Теперь категория тоже сбрасывается
+      visibility: "global", // ИСПРАВЛЕНО: Убрали дубликат строк ниже
+      color: "#8B5CF6", // ИСПРАВЛЕНО: Убрали дубликат строк ниже
     }),
 }));

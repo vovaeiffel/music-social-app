@@ -27,8 +27,8 @@ function MarkersLayer({ pins }: Props) {
           position={[pin.latitude, pin.longitude]}
           icon={
             selectedPin?.id === pin.id
-              ? getActivePinIcon(pin.pin_type)
-              : getPinIcon(pin.pin_type)
+              ? getActivePinIcon(pin.pin_type, pin.visibility, pin.color)
+              : getPinIcon(pin.pin_type, pin.visibility, pin.color)
           }
           eventHandlers={{
             click: (e) => {

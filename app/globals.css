@@ -38,3 +38,8 @@ body {
     color: inherit !important;
   }
 }
+
+/* Скрываем скроллбар для аккуратных мини-контейнеров */
+.scrollbar-thin::-webkit-scrollbar {
+  display: none;
+}

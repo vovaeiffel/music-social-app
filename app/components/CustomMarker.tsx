@@ -1,85 +1,119 @@
 import L from "leaflet";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ComponentType } from "react"; // <-- ДОБАВИЛИ ИМПОРТ
 
-export function getPinIcon(type?: string) {
-  switch (type) {
-    case "concert":
-      return concertIcon;
+import {
+  Music,
+  Mic,
+  Car,
+  Tent,
+  Moon,
+  Sun,
+  User,
+  Compass,
+  LucideProps,
+  Headphones,
+  Guitar,
+  Sparkles,
+  Wine,
+  Beer,
+  Trophy,
+  Plane,
+  Heart,
+  Flame,
+  Dumbbell,
+  // 3 НОВЫЕ ИКОНКИ:
+  Clapperboard,
+  Camera,
+  Coffee,
+} from "lucide-react";
 
-    case "roadtrip":
-      return roadtripIcon;
+const iconMap: Record<string, ComponentType<LucideProps>> = {
+  music: Music,
+  concert: Mic,
+  roadtrip: Car,
+  camping: Tent,
+  night: Moon,
+  summer: Sun,
+  person: User,
+  headphones: Headphones,
+  guitar: Guitar,
+  party: Sparkles,
+  bar: Wine,
+  pub: Beer,
+  festival: Trophy,
+  travel: Plane,
+  love: Heart,
+  chill: Flame,
+  sport: Dumbbell,
+  // Добавляем в маппинг карты:
+  cinema: Clapperboard,
+  photo: Camera,
+  cafe: Coffee,
+};
+function createDynamicIcon(
+  type = "music",
+  active = false,
+  visibility?: string,
+  color?: string,
+) {
+  // Находим нужный компонент иконки
+  const IconComponent = iconMap[type] || Compass;
 
-    case "camping":
-      return campingIcon;
+  // Рендерим React-иконку в чистый SVG-код для Leaflet
+  // Делаем размер иконки чуть меньше контейнера, чтобы она аккуратно сидела внутри
+  const iconSizePx = active ? 24 : 20;
+  const svgHtml = renderToStaticMarkup(
+    <IconComponent
+      size={iconSizePx}
+      strokeWidth={2.5}
+      color={active && !color ? "black" : "white"}
+    />,
+  );
 
-    case "night":
-      return nightIcon;
-
-    case "summer":
-      return summerIcon;
-
-    case "person":
-      return personIcon;
-
-    case "music":
-    default:
-      return musicIcon;
+  // Вычисляем фон
+  let background = active ? "rgba(255, 255, 255, 1)" : "rgba(0, 0, 0, 0.75)";
+  if (!active) {
+    if (visibility === "private") {
+      background = "rgb(39, 39, 42)";
+    } else if (color) {
+      background = color;
+    }
+  } else {
+    if (visibility === "private") {
+      background = "rgb(63, 63, 70)";
+    } else if (color) {
+      background = color;
+    }
   }
-}
 
-export function getActivePinIcon(type?: string) {
-  switch (type) {
-    case "concert":
-      return activeConcertIcon;
+  const border = active
+    ? "3px solid rgba(255, 255, 255, 1)"
+    : "1px solid rgba(255, 255, 255, 0.2)";
 
-    case "roadtrip":
-      return activeRoadtripIcon;
+  const shadow =
+    active && color && visibility !== "private"
+      ? `0 0 25px ${color}, 0 10px 30px rgba(0,0,0,0.5)`
+      : "0 10px 30px rgba(0,0,0,0.35)";
 
-    case "camping":
-      return activeCampingIcon;
-
-    case "night":
-      return activeNightIcon;
-
-    case "summer":
-      return activeSummerIcon;
-
-    case "person":
-      return activePersonIcon;
-
-    case "music":
-    default:
-      return activeMusicIcon;
-  }
-}
-
-function createEmojiIcon(emoji: string, active = false) {
   return L.divIcon({
     className: "",
     html: `
       <div
         style="
-          width:${active ? 52 : 42}px;
-          height:${active ? 52 : 42}px;
-
-          border-radius:999px;
-
-          background:${active ? "white" : "rgba(0,0,0,0.75)"};
-
-          border:1px solid rgba(255,255,255,0.15);
-
-          display:flex;
-          align-items:center;
-          justify-content:center;
-
-          font-size:${active ? 26 : 22}px;
-
-          box-shadow:
-            0 10px 30px rgba(0,0,0,0.35);
-
-          transition:all .2s ease;
+          width: ${active ? 52 : 42}px;
+          height: ${active ? 52 : 42}px;
+          border-radius: 999px;
+          background: ${background};
+          border: ${border};
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: ${shadow};
+          transition: all .2s ease;
         "
       >
-        ${emoji}
+        ${svgHtml}
       </div>
     `,
     iconSize: active ? [52, 52] : [42, 42],
@@ -88,18 +122,14 @@ function createEmojiIcon(emoji: string, active = false) {
   });
 }
 
-export const musicIcon = createEmojiIcon("🎵");
-export const concertIcon = createEmojiIcon("🎤");
-export const roadtripIcon = createEmojiIcon("🚗");
-export const campingIcon = createEmojiIcon("⛺");
-export const nightIcon = createEmojiIcon("🌙");
-export const summerIcon = createEmojiIcon("☀️");
-export const personIcon = createEmojiIcon("👤");
+export function getPinIcon(type?: string, visibility?: string, color?: string) {
+  return createDynamicIcon(type, false, visibility, color);
+}
 
-export const activeMusicIcon = createEmojiIcon("🎵", true);
-export const activeConcertIcon = createEmojiIcon("🎤", true);
-export const activeRoadtripIcon = createEmojiIcon("🚗", true);
-export const activeCampingIcon = createEmojiIcon("⛺", true);
-export const activeNightIcon = createEmojiIcon("🌙", true);
-export const activeSummerIcon = createEmojiIcon("☀️", true);
-export const activePersonIcon = createEmojiIcon("👤", true);
+export function getActivePinIcon(
+  type?: string,
+  visibility?: string,
+  color?: string,
+) {
+  return createDynamicIcon(type, true, visibility, color);
+}

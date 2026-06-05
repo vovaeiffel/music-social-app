@@ -18,12 +18,14 @@ type Props = {
   currentUserId: string;
 
   onClose: () => void;
+  onVisitMap: () => void;
 };
 
 export default function UserProfilePanel({
   profile,
   currentUserId,
   onClose,
+  onVisitMap,
 }: Props) {
   const [following, setFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
@@ -197,6 +199,15 @@ export default function UserProfilePanel({
   "
         >
           {following ? "Unfollow" : "Follow"}
+        </button>
+
+        {/* КНОПКА ПУТЕШЕСТВИЯ НА КАРТУ ПОЛЬЗОВАТЕЛЯ */}
+        <button
+          onClick={onVisitMap}
+          className="w-full mt-4 flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-medium py-3 px-4 rounded-2xl transition shadow-lg shadow-indigo-500/10 active:scale-[0.98]"
+        >
+          <span>🗺️</span>
+          {`Explore ${profile?.display_name || profile?.username || "User"}'s Map`}
         </button>
       </div>
     </div>
