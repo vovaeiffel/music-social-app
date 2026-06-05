@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import ProfilePanel from "./components/profile/ProfilePanel";
 import ProfileOverlay from "./components/overlays/ProfileOverlay";
+import UserProfilePanel from "./components/profile/UserProfilePanel";
 import { useCreatePinStore } from "@/app/store/createPinStore";
 import { loadPins } from "@/app/services/pinsService";
 import {
@@ -91,7 +92,16 @@ export default function Home() {
 
   const [isProfileOverlayOpen, setIsProfileOverlayOpen] = useState(false);
 
+  const [isUserProfileOpen, setIsUserProfileOpen] = useState(false);
+
+  const [selectedUserProfile, setSelectedUserProfile] =
+    useState<UserProfileType | null>(null);
+
   const [pins, setPins] = useState<PinType[]>([]);
+
+  const [savedPins, setSavedPins] = useState<PinType[]>([]);
+
+  const [isShowingSaved, setIsShowingSaved] = useState(false);
 
   const selectedPin = usePinStore((state) => state.selectedPin);
 
@@ -114,6 +124,10 @@ export default function Home() {
         ...pin,
         liked_by_user: likedPinIds.includes(pin.id),
       }));
+
+      const saved = pinsWithLikes.filter((pin) => pin.liked_by_user);
+
+      setSavedPins(saved);
 
       setPins(pinsWithLikes);
     } catch (error) {
@@ -178,13 +192,16 @@ export default function Home() {
   useEffect(() => {
     const unsubscribe = checkUser();
 
+    loadPinsData();
     getLocation();
 
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    loadPinsData();
+    if (user) {
+      loadPinsData();
+    }
   }, [user]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -195,14 +212,20 @@ export default function Home() {
       pinId,
       liked,
     });
+
     try {
       if (liked) {
         await unlikePin(user.id, pinId);
+
         await updateDoc(doc(db, "pins", pinId), {
           likes_count: increment(-1),
         });
       } else {
         await likePin(user.id, pinId);
+
+        await updateDoc(doc(db, "pins", pinId), {
+          likes_count: increment(1),
+        });
       }
 
       const updatedPins = pins.map((pin) => {
@@ -212,7 +235,7 @@ export default function Home() {
           ...pin,
           liked_by_user: !liked,
           likes_count: liked
-            ? (pin.likes_count || 1) - 1
+            ? (pin.likes_count || 0) - 1
             : (pin.likes_count || 0) + 1,
         };
       });
@@ -224,7 +247,7 @@ export default function Home() {
           ...selectedPin,
           liked_by_user: !liked,
           likes_count: liked
-            ? (selectedPin.likes_count || 1) - 1
+            ? (selectedPin.likes_count || 0) - 1
             : (selectedPin.likes_count || 0) + 1,
         });
       }
@@ -339,6 +362,9 @@ export default function Home() {
         // PROFILE PANEL
         <div className="relative h-full w-full">
           <ProfilePanel
+            savedPins={savedPins}
+            isShowingSaved={isShowingSaved}
+            setIsShowingSaved={setIsShowingSaved}
             profile={profile}
             user={user}
             pins={pins}
@@ -348,7 +374,49 @@ export default function Home() {
             isProfileOpen={isProfileOpen}
             setIsProfileOpen={setIsProfileOpen}
             openProfileOverlay={() => setIsProfileOverlayOpen(true)}
+            // ДОБАВЬ ЭТУ СТРОКУ, ЕСЛИ ОНА СЛУЧАЙНО СТЕРЛАСЬ:
+            onOpenUserProfile={(prof) => {
+              setSelectedUserProfile(prof);
+              setIsUserProfileOpen(true);
+            }}
           />
+
+          <button
+            onClick={() => {
+              setSelectedUserProfile({
+                id: "fake_user_id_123",
+                username: "daft_punk_fan",
+                display_name: "Thomas Bangalter",
+                bio: "Electronic music lover",
+                status: "Listening to Homework 🎧",
+                avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Thomas", // генерирует забавную иконку робота
+                created_at: Date.now(),
+                pins_count: 12,
+                likes_received: 42,
+              });
+              setIsUserProfileOpen(true);
+            }}
+            className="
+    absolute
+    top-80
+    left-4
+    z-[9999]
+    bg-blue-500
+    px-3
+    py-2
+    rounded-xl
+  "
+          >
+            TEST USER PANEL
+          </button>
+
+          {isUserProfileOpen && (
+            <UserProfilePanel
+              profile={selectedUserProfile}
+              currentUserId={user.id}
+              onClose={() => setIsUserProfileOpen(false)}
+            />
+          )}
 
           <div className="h-full w-full">
             <div className="h-full w-full">
@@ -437,6 +505,13 @@ export default function Home() {
                   setIsCreatingPin(true);
                 }}
                 onDeletePin={deletePin}
+                onOpenUserProfile={async (userId) => {
+                  const profileData = await getUserProfile(userId);
+
+                  setSelectedUserProfile(profileData);
+
+                  setIsUserProfileOpen(true);
+                }}
               />
 
               <div

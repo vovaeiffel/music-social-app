@@ -26,6 +26,8 @@ type Props = {
   onEditPin: (pin: PinType) => void;
 
   onDeletePin: (pinId: string) => void;
+
+  onOpenUserProfile: (userId: string) => void;
 };
 
 function SelectedPinOverlay({
@@ -34,6 +36,7 @@ function SelectedPinOverlay({
   currentUserId,
   onEditPin,
   onDeletePin,
+  onOpenUserProfile,
 }: Props) {
   const selectedPin = usePinStore((state) => state.selectedPin);
 
@@ -160,7 +163,17 @@ function SelectedPinOverlay({
               mb-3
             "
         >
-          <div className="flex items-center gap-2 mb-3">
+          <button
+            onClick={() => onOpenUserProfile(pin.user_id)}
+            className="
+    flex
+    items-center
+    gap-2
+    mb-3
+    hover:opacity-80
+    transition
+  "
+          >
             {pin.user_avatar && (
               <img
                 src={pin.user_avatar}
@@ -176,7 +189,7 @@ function SelectedPinOverlay({
 
               <p className="text-[11px] text-white/40">music memory</p>
             </div>
-          </div>
+          </button>
 
           <div>
             <h2

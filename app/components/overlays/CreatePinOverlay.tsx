@@ -194,6 +194,7 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
         outline-none
       "
           />
+
           <input
             type="text"
             placeholder="Paste YouTube / Spotify / Yandex link"

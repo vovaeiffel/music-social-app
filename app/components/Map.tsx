@@ -41,6 +41,8 @@ type Props = {
   onEditPin: (pin: PinType) => void;
 
   onDeletePin: (pinId: string) => void;
+
+  onOpenUserProfile: (userId: string) => void;
 };
 
 export default function Map({
@@ -50,6 +52,7 @@ export default function Map({
   currentUserId,
   onEditPin,
   onDeletePin,
+  onOpenUserProfile,
 }: Props) {
   const {
     songTitle,
@@ -117,6 +120,7 @@ export default function Map({
             currentUserId={currentUserId}
             onEditPin={onEditPin}
             onDeletePin={onDeletePin}
+            onOpenUserProfile={onOpenUserProfile}
           />
         )}
         {isCreatingPin && selectedLat !== null && selectedLng !== null && (
@@ -152,7 +156,13 @@ export default function Map({
           </Marker>
         )}
 
-        <MarkersLayer pins={pins} />
+        <MarkerClusterGroup
+          {...clusterOptions}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onClick={handleClusterClick}
+        >
+          <MarkersLayer pins={pins} />
+        </MarkerClusterGroup>
       </MapContainer>
     </div>
   );

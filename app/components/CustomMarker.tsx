@@ -1,5 +1,57 @@
 import L from "leaflet";
 
+export function getPinIcon(type?: string) {
+  switch (type) {
+    case "concert":
+      return concertIcon;
+
+    case "roadtrip":
+      return roadtripIcon;
+
+    case "camping":
+      return campingIcon;
+
+    case "night":
+      return nightIcon;
+
+    case "summer":
+      return summerIcon;
+
+    case "person":
+      return personIcon;
+
+    case "music":
+    default:
+      return musicIcon;
+  }
+}
+
+export function getActivePinIcon(type?: string) {
+  switch (type) {
+    case "concert":
+      return activeConcertIcon;
+
+    case "roadtrip":
+      return activeRoadtripIcon;
+
+    case "camping":
+      return activeCampingIcon;
+
+    case "night":
+      return activeNightIcon;
+
+    case "summer":
+      return activeSummerIcon;
+
+    case "person":
+      return activePersonIcon;
+
+    case "music":
+    default:
+      return activeMusicIcon;
+  }
+}
+
 function createEmojiIcon(emoji: string, active = false) {
   return L.divIcon({
     className: "",
@@ -51,53 +103,3 @@ export const activeCampingIcon = createEmojiIcon("⛺", true);
 export const activeNightIcon = createEmojiIcon("🌙", true);
 export const activeSummerIcon = createEmojiIcon("☀️", true);
 export const activePersonIcon = createEmojiIcon("👤", true);
-
-export function getPinIcon(type?: string) {
-  switch (type) {
-    case "concert":
-      return concertIcon;
-
-    case "roadtrip":
-      return roadtripIcon;
-
-    case "camping":
-      return campingIcon;
-
-    case "night":
-      return nightIcon;
-
-    case "summer":
-      return summerIcon;
-
-    case "person":
-      return personIcon;
-
-    default:
-      return musicIcon;
-  }
-}
-
-export function getActivePinIcon(type?: string) {
-  switch (type) {
-    case "concert":
-      return activeConcertIcon;
-
-    case "roadtrip":
-      return activeRoadtripIcon;
-
-    case "camping":
-      return activeCampingIcon;
-
-    case "night":
-      return activeNightIcon;
-
-    case "summer":
-      return activeSummerIcon;
-
-    case "person":
-      return activePersonIcon;
-
-    default:
-      return activeMusicIcon;
-  }
-}
