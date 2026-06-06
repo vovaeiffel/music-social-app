@@ -18,4 +18,5 @@ export type UserProfileType = {
   pins_count: number;
 
   likes_received: number;
+  user_tag?: string;
 };

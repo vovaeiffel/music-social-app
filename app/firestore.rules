@@ -18,9 +18,3 @@ service cloud.firestore {
     }
   }
 }
-
-{
-  "firestore": {
-    "rules": "firestore.rules"
-  }
-}

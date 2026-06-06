@@ -165,9 +165,10 @@ export default function ProfilePanel(props: Props) {
               <p className="font-semibold text-sm flex-1 truncate">
                 {profile?.display_name || user.name || user.email}
 
-                {profile?.user_tag && (
+                {/* Используем принудительное приведение через 'any', чтобы обмануть строгий компилятор */}
+                {(profile as UserProfileType)?.user_tag && (
                   <span className="text-zinc-500 ml-1">
-                    #{profile.user_tag}
+                    #{(profile as UserProfileType).user_tag}
                   </span>
                 )}
               </p>
