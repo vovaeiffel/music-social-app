@@ -1,5 +1,4 @@
 import { db } from "@/lib/firebase";
-
 import {
   doc,
   setDoc,
@@ -10,6 +9,9 @@ import {
   query,
   where,
 } from "firebase/firestore";
+
+// Вспомогательная функция задержки
+const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 export type LikeType = {
   user_id: string;
@@ -42,6 +44,9 @@ export async function isPinLiked(userId: string, pinId: string) {
 }
 
 export async function getUserLikes(userId: string) {
+  // Добавляем паузу, чтобы не "бить" по серверу в момент старта приложения
+  await delay(200);
+
   const likesQuery = query(
     collection(db, "likes"),
     where("user_id", "==", userId),
