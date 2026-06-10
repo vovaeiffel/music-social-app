@@ -32,4 +32,5 @@ export type PinType = {
 
   likes_count?: number;
   liked_by_user?: boolean;
+  image_url?: string;
 };

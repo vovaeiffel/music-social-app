@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useRef } from "react";
 import { useCreatePinStore } from "@/app/store/createPinStore";
 
 import {
@@ -24,6 +24,8 @@ import {
   Clapperboard,
   Camera,
   Coffee,
+  X,
+  ImagePlus,
 } from "lucide-react";
 
 import { useMap } from "react-leaflet";
@@ -38,7 +40,6 @@ type Props = {
 };
 
 function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
-  // ИСПРАВЛЕНО: Достаем новые переменные links и setLink вместо старых одиночных URL
   const {
     songTitle,
     setSongTitle,
@@ -52,22 +53,27 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
     setVisibility,
     color,
     setColor,
-    selectedPinType,
+    selectedPinType, // <- убедитесь, что название совпадает с вашим стором (selectedPinType или pinType)
     setSelectedPinType,
-  } = useCreatePinStore();
+    imageFile, // Должно быть добавлено в ваш useCreatePinStore
+    setImageFile, // Должно быть добавлено в ваш useCreatePinStore
+  } = useCreatePinStore(); // Временно as any для избежания ошибок типизации, если стор еще не типизирован
 
   const map = useMap();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [position, setPosition] = useState({
     x: 0,
     y: 0,
   });
 
+  // Локальный стейт для превью картинки (чтобы не гонять тяжелые файлы по стору)
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
   useEffect(() => {
     function updatePosition() {
-      // Используем requestAnimationFrame, чтобы отложить обновление до следующего кадра
       requestAnimationFrame(() => {
-        if (!map) return; // Проверка на случай размонтирования карты
+        if (!map) return;
         const point = map.latLngToContainerPoint([lat, lng]);
         setPosition({
           x: point.x,
@@ -76,14 +82,11 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
       });
     }
 
-    // Вызываем обновление при создании
     updatePosition();
 
-    // Подписываемся на события карты
     map.on("move", updatePosition);
     map.on("zoom", updatePosition);
 
-    // Очистка подписок
     return () => {
       map.off("move", updatePosition);
       map.off("zoom", updatePosition);
@@ -97,7 +100,6 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
     if (lowerUrl.includes("youtube.com") || lowerUrl.includes("youtu.be")) {
       return { name: "YouTube", color: "text-red-500", icon: "📺" };
     }
-    // Исправили тестовую заглушку спотифая на проверку реального домена spotify.com
     if (lowerUrl.includes("spotify.com") || lowerUrl.includes("open.spotify")) {
       return { name: "Spotify", color: "text-green-500", icon: "🎵" };
     }
@@ -106,6 +108,39 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
     }
     return { name: "Link", color: "text-indigo-400", icon: "🔗" };
   }
+
+  // Обработчик выбора файла
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Проверка: разрешаем только изображения
+      if (!file.type.startsWith("image/")) {
+        alert("Пожалуйста, выберите изображение.");
+        return;
+      }
+      // Ограничение: размер не более 5 МБ (чтобы не забить хранилище Firebase)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Размер файла не должен превышать 5 МБ.");
+        return;
+      }
+
+      // Сохраняем файл в глобальный стор
+      if (setImageFile) setImageFile(file);
+
+      // Создаем URL для предпросмотра
+      const previewUrl = URL.createObjectURL(file);
+      setImagePreview(previewUrl);
+    }
+  };
+
+  // Удаление выбранной фотографии
+  const handleRemoveImage = () => {
+    if (setImageFile) setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   return (
     <div
@@ -123,7 +158,7 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
         top: position.y - 220,
       }}
     >
-      <div className="rounded-3xl bg-zinc-900/85 supports-[backdrop-filter]:bg-zinc-900/70 backdrop-blur-3xl border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.45)] p-4 text-white origin-bottom">
+      <div className="rounded-3xl bg-zinc-900/85 supports-[backdrop-filter]:bg-zinc-900/70 backdrop-blur-3xl border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.45)] p-4 text-white origin-bottom max-h-[80vh] overflow-y-auto scrollbar-thin">
         {/* ШАПКА ОВЕРЛЕЯ */}
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-white/90">New memory</h2>
@@ -162,17 +197,61 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
             className="w-full h-24 resize-none rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm outline-none"
           />
 
-          {/* ДИНАМИЧЕСКИЕ ПОЛЯ ДЛЯ ССЫЛОК (Макс 5 штук) */}
+          {/* ЗАГРУЗКА ФОТО */}
+          <div className="flex flex-col gap-1.5 my-2">
+            <span className="text-[11px] font-medium text-white/60 text-left px-1">
+              Add photo (max 1, up to 5MB):
+            </span>
+
+            {/* Скрытый инпут файла */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            {!imagePreview ? (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-white/5 border border-dashed border-white/20 hover:bg-white/10 transition text-xs text-zinc-300"
+              >
+                <ImagePlus size={16} />
+                <span>Select photo</span>
+              </button>
+            ) : (
+              <div className="relative w-full h-40 rounded-xl overflow-hidden border border-white/10 group">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  className="absolute top-2 right-2 p-1.5 bg-red-600/90 hover:bg-red-600 text-white rounded-full transition shadow-md"
+                  title="Удалить фото"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ДИНАМИЧЕСКИЕ ПОЛЯ ДЛЯ ССЫЛОК */}
           <div className="flex flex-col gap-2 my-2">
             <span className="text-[11px] font-medium text-white/60 text-left px-1 flex justify-between items-center">
               <span>Music links (max 5):</span>
               <span className="text-zinc-500 text-[10px]">
-                {links.filter((l) => l.trim() !== "").length} / 5
+                {links.filter((l: string) => l.trim() !== "").length} / 5
               </span>
             </span>
 
-            <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1 scrollbar-thin">
-              {links.map((link, index) => {
+            <div className="flex flex-col gap-2 max-h-[120px] overflow-y-auto pr-1 scrollbar-thin">
+              {links.map((link: string, index: number) => {
                 const platform = detectMusicPlatform(link);
 
                 return (
@@ -180,7 +259,6 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
                     key={index}
                     className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 focus-within:border-white/20 transition-all"
                   >
-                    {/* Индикатор платформы */}
                     <span
                       className={`text-base ${platform.color}`}
                       title={platform.name}
@@ -188,7 +266,6 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
                       {platform.icon}
                     </span>
 
-                    {/* Поле ввода ссылки */}
                     <input
                       type="text"
                       value={link}
@@ -197,7 +274,6 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
                       className="w-full bg-transparent text-xs text-white outline-none placeholder-zinc-500"
                     />
 
-                    {/* Подсказка платформы */}
                     {link.trim() !== "" && (
                       <span
                         className={`text-[9px] font-bold uppercase tracking-wider ${platform.color}`}
@@ -325,7 +401,7 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
             </span>
           </div>
 
-          {/* ИСПРАВЛЕНО: БЛОК ВЫБОРА ЦВЕТА ОСТАЛСЯ ОДИН, ЧИСТЫЙ */}
+          {/* ВЫБОР ЦВЕТА */}
           {visibility === "global" && (
             <div className="p-2 rounded-xl bg-white/5 border border-white/10 my-2">
               <span className="text-[11px] font-medium text-white/60 block mb-2 text-left">

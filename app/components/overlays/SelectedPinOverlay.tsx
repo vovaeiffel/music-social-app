@@ -236,6 +236,16 @@ function SelectedPinOverlay({
           {pin.story}
         </p>
 
+        {pin.image_url && (
+          <div className="mb-4 w-full h-48 overflow-hidden rounded-2xl border border-white/10">
+            <img
+              src={pin.image_url}
+              alt="Pin photo"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        )}
+
         {pin.music_links && pin.music_links.length > 0 && (
           <div className="mt-4 flex flex-col gap-3">
             {pin.music_links && pin.music_links.length > 0 && (

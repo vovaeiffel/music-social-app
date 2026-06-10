@@ -16,6 +16,10 @@ type CreatePinStore = {
   links: string[];
   setLink: (index: number, value: string) => void;
 
+  // Добавляем поля для загрузки одной фотографии
+  imageFile: File | null;
+  setImageFile: (file: File | null) => void;
+
   selectedLat: number | null;
   setSelectedLat: (lat: number | null) => void;
 
@@ -53,7 +57,6 @@ export const useCreatePinStore = create<CreatePinStore>((set) => ({
   placeName: "",
   setPlaceName: (value) => set({ placeName: value }),
 
-  // Инициализируем массивом с одной пустой строкой
   links: [""],
 
   setLink: (index, value) =>
@@ -61,8 +64,6 @@ export const useCreatePinStore = create<CreatePinStore>((set) => ({
       const newLinks = [...state.links];
       newLinks[index] = value;
 
-      // Авто-добавление нового пустого поля:
-      // Если текущее поле не пустое, оно последнее в списке, и мы еще не достигли лимита в 5 ссылок
       if (
         value.trim() !== "" &&
         index === newLinks.length - 1 &&
@@ -71,8 +72,6 @@ export const useCreatePinStore = create<CreatePinStore>((set) => ({
         newLinks.push("");
       }
 
-      // Авто-удаление пустых полей с конца (чтобы не плодить пустые строки, если стерли текст)
-      // Но оставляем хотя бы одно поле, даже если оно пустое
       while (
         newLinks.length > 1 &&
         newLinks[newLinks.length - 1].trim() === "" &&
@@ -83,6 +82,10 @@ export const useCreatePinStore = create<CreatePinStore>((set) => ({
 
       return { links: newLinks };
     }),
+
+  // Реализация функций и начального состояния для фото
+  imageFile: null,
+  setImageFile: (file) => set({ imageFile: file }),
 
   selectedLat: null,
   setSelectedLat: (lat) => set({ selectedLat: lat }),
@@ -99,7 +102,7 @@ export const useCreatePinStore = create<CreatePinStore>((set) => ({
   editingPinId: null,
   setEditingPinId: (id) => set({ editingPinId: id }),
 
-  color: "#8B5CF6", // По умолчанию фиолетовый
+  color: "#8B5CF6",
   setColor: (value) => set({ color: value }),
 
   visibility: "global",
@@ -111,13 +114,14 @@ export const useCreatePinStore = create<CreatePinStore>((set) => ({
       artistName: "",
       story: "",
       placeName: "",
-      links: [""], // Сбрасываем в исходное состояние с одним пустым полем
+      links: [""],
+      imageFile: null, // Сбрасываем выбранную картинку
       selectedLat: null,
       selectedLng: null,
       editingPinId: null,
       isCreatingPin: false,
-      selectedPinType: null, // ИСПРАВЛЕНО: Теперь категория тоже сбрасывается
-      visibility: "global", // ИСПРАВЛЕНО: Убрали дубликат строк ниже
-      color: "#8B5CF6", // ИСПРАВЛЕНО: Убрали дубликат строк ниже
+      selectedPinType: null,
+      visibility: "global",
+      color: "#8B5CF6",
     }),
 }));

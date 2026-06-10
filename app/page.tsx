@@ -254,7 +254,7 @@ export default function Home() {
       return;
     }
 
-    const { visibility, color } = useCreatePinStore.getState();
+    const { visibility, color, imageFile } = useCreatePinStore.getState();
     const cleanedLinks = links.filter((link) => link.trim() !== "");
 
     const buildLegacyMusicLinks = (urls: string[]) => {
@@ -270,6 +270,33 @@ export default function Home() {
     };
 
     try {
+      let imageUrl = "";
+
+      // Загрузка фото через API ImgBB
+      if (imageFile) {
+        const IMGBB_API_KEY = "bd4cb85df9af68361f0a0d7e2f15e5d2"; // <-- Вставьте сюда ваш ключ
+
+        const formData = new FormData();
+        formData.append("image", imageFile);
+
+        const response = await fetch(
+          `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
+          {
+            method: "POST",
+            body: formData,
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to upload image to ImgBB");
+        }
+
+        const data = await response.json();
+        imageUrl = data.data.url; // Получаем прямую ссылку на картинку
+      } else if (editingPinId) {
+        imageUrl = pins.find((p) => p.id === editingPinId)?.image_url || "";
+      }
+
       const pinData = {
         user_id: user.id,
         pin_type: selectedPinType,
@@ -287,6 +314,7 @@ export default function Home() {
         yandex_url: cleanedLinks.find((l) => l.includes("yandex")) || "",
         latitude: selectedLat,
         longitude: selectedLng,
+        image_url: imageUrl,
         likes_count: editingPinId
           ? pins.find((p) => p.id === editingPinId)?.likes_count || 0
           : 0,
