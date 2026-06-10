@@ -1,6 +1,5 @@
 "use client";
 
-// 1. ИСПРАВЛЕНО: Добавили useMapEvents в импорт из react-leaflet
 import {
   MapContainer,
   TileLayer,
@@ -15,7 +14,7 @@ import { useCreatePinStore } from "@/app/store/createPinStore";
 import L from "leaflet";
 
 import { clusterOptions } from "./map/config/clusterConfig";
-import SearchBar from "./overlays/SearchBar";
+// import SearchBar from "./overlays/SearchBar"; // закомментировано, если не используется явно ниже
 
 import MapClickHandler from "./map/helpers/MapClickHandler";
 import { useMapPosition } from "@/app/hooks/useMapPosition";
@@ -37,6 +36,40 @@ import SelectedPinOverlay from "./overlays/SelectedPinOverlay";
 import "leaflet/dist/leaflet.css";
 import { useCallback, useEffect, useState } from "react";
 
+// Список доступных карт (рельеф, темная, спутник и т.д.)
+const MAP_STYLES = [
+  {
+    name: "Стандартная",
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+    attribution: "&copy; CARTO",
+    hasLabels: false,
+  },
+  {
+    name: "OpenStreetMap (Подробная)",
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "&copy; OpenStreetMap contributors",
+    hasLabels: false, // На ней уже есть все подписи и дороги
+  },
+  {
+    name: "Тёмная",
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png",
+    attribution: "&copy; CARTO",
+    hasLabels: false,
+  },
+  {
+    name: "Спутник",
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution: "Tiles &copy; Esri",
+    hasLabels: true, // Прозрачный оверлей с названиями остается для спутника
+  },
+  {
+    name: "Минималистичная",
+    url: "https://{s}.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}{r}.png",
+    attribution: "&copy; CARTO",
+    hasLabels: false,
+  },
+];
+
 // Вспомогательный компонент для перехвата событий карты
 function MapEventsHandler({
   onMapDblClick,
@@ -45,7 +78,6 @@ function MapEventsHandler({
 }) {
   useMapEvents({
     dblclick(e: L.LeafletMouseEvent) {
-      // <-- ПРОПИСАЛИ ЧЕРЕЗ L.
       onMapDblClick(e.latlng.lat, e.latlng.lng);
     },
   });
@@ -83,7 +115,9 @@ export default function Map({
   onOpenUserProfile,
   searchPos,
 }: Props) {
-  // Достаем нужные функции, включая resetForm
+  // Состояние для хранения выбранной подложки карты (по умолчанию первая)
+  const [currentMap, setCurrentMap] = useState(MAP_STYLES[0]);
+
   const {
     selectedPinType,
     selectedLat,
@@ -92,7 +126,7 @@ export default function Map({
     setSelectedLng,
     isCreatingPin,
     setIsCreatingPin,
-    resetForm, // <-- ДОБАВИЛИ СЮДА
+    resetForm,
   } = useCreatePinStore();
 
   useEffect(() => {
@@ -112,16 +146,15 @@ export default function Map({
   }, [setSelectedPin]);
 
   const handleCloseCreatePin = useCallback(() => {
-    resetForm(); // <-- ЭТО КЛЮЧЕВОЙ МОМЕНТ: сбрасывает lat, lng и все текстовые поля в Zustand
+    resetForm();
     setIsCreatingPin(false);
   }, [resetForm, setIsCreatingPin]);
 
-  // 3. ИСПРАВЛЕНО: Объявили обработчик дабл-клика внутри основного компонента
   const handleMapDblClick = (lat: number, lng: number) => {
-    resetForm(); // Полностью очищаем поля формы
-    setSelectedLat(lat); // Записываем широту
-    setSelectedLng(lng); // Записываем долготу
-    setIsCreatingPin(true); // Открываем оверлей создания пина!
+    resetForm();
+    setSelectedLat(lat);
+    setSelectedLng(lng);
+    setIsCreatingPin(true);
   };
 
   console.log("pins", pins);
@@ -132,12 +165,32 @@ export default function Map({
         height: "100vh",
         width: "100%",
       }}
-      className="rounded-2xl overflow-hidden"
+      className="rounded-2xl overflow-hidden relative"
     >
+      {/* Меню выбора карт поверх карты (справа вверху) */}
+      <div className="absolute top-4 right-4 z-[1000] bg-white/90 backdrop-blur-md p-2 rounded-xl shadow-lg border border-zinc-200 flex flex-col gap-1.5 max-w-[200px]">
+        <span className="text-xs font-semibold text-zinc-700 px-1">
+          Стиль карты:
+        </span>
+        {MAP_STYLES.map((style) => (
+          <button
+            key={style.name}
+            onClick={() => setCurrentMap(style)}
+            className={`text-left text-xs px-3 py-1.5 rounded-lg transition-colors ${
+              currentMap.name === style.name
+                ? "bg-blue-600 text-white font-medium"
+                : "text-zinc-600 hover:bg-zinc-100"
+            }`}
+          >
+            {style.name}
+          </button>
+        ))}
+      </div>
+
       <MapContainer
         zoomAnimation={true}
         fadeAnimation={true}
-        doubleClickZoom={false} // <-- ВАЖНО: Отключили зум по дабл-клику!
+        doubleClickZoom={false}
         markerZoomAnimation={true}
         zoomAnimationThreshold={1}
         className={selectedPinType ? "cursor-crosshair" : ""}
@@ -155,7 +208,6 @@ export default function Map({
         <SaveMapPosition />
         <FlyToPin pin={selectedPin} />
 
-        {/* 4. ДОБАВИЛИ: Наш обработчик двойного клика встал внутрь карты */}
         <MapEventsHandler onMapDblClick={handleMapDblClick} />
 
         {selectedPin && (
@@ -171,17 +223,22 @@ export default function Map({
 
         {isCreatingPin && (
           <CreatePinOverlay
-            lat={selectedLat || 0} // Добавляем дефолтное значение 0, если вдруг null
+            lat={selectedLat || 0}
             lng={selectedLng || 0}
             createPin={createPin}
             onClose={handleCloseCreatePin}
           />
         )}
 
-        <TileLayer
-          attribution="&copy; CARTO"
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        />
+        {/* Динамическая подложка карты, меняющаяся по клику в меню */}
+        <TileLayer attribution={currentMap.attribution} url={currentMap.url} />
+        {currentMap.hasLabels && (
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
+            attribution="&copy; CARTO contributors"
+            pane="overlayPane" // Гарантирует, что лейблы рисуются поверх базовой карты
+          />
+        )}
 
         <MapClickHandler
           setSelectedPin={setSelectedPin}
@@ -203,11 +260,7 @@ export default function Map({
           </Marker>
         )}
 
-        <MarkerClusterGroup
-          {...clusterOptions}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          onClick={handleClusterClick}
-        >
+        <MarkerClusterGroup {...clusterOptions} onClick={handleClusterClick}>
           <MarkersLayer pins={pins} />
         </MarkerClusterGroup>
       </MapContainer>
