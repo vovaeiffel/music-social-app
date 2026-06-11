@@ -7,18 +7,22 @@ type Props = {
 export default function WelcomeScreen({ onGoogleLogin }: Props) {
   return (
     <div className="min-h-screen w-full bg-zinc-950 flex items-center justify-center p-6 text-white relative">
-      {/* Карточка по центру, внутри которой будет фон и контент */}
+      {/* Карточка по центру */}
       <div className="w-full max-w-md relative rounded-3xl overflow-hidden p-8 flex flex-col items-center justify-center text-center shadow-2xl border border-white/10">
-        {/* Ваша картинка как фон карточки */}
+        {/* Ваша картинка как фон карточки с фильтром инверсии */}
         <div
-          className="absolute inset-0 bg-cover bg-center opacity-15 pointer-events-none"
-          style={{ backgroundImage: "url('/logo.png')" }}
+          className="absolute inset-0 bg-cover bg-center pointer-events-none"
+          style={{
+            backgroundImage: "url('/logo.png')",
+            opacity: 0.1, // Оставляем её очень бледной, чтобы не мешала тексту
+            filter: "brightness(0) invert(1)", // ⬅️ ДЕЛАЕМ ЧЁРНОЕ БЕЛЫМ, чтобы его стало видно
+          }}
         />
 
-        {/* Затемнение поверх картинки, чтобы текст и кнопка были четкими */}
-        <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-md pointer-events-none" />
+        {/* Затемнение поверх картинки (чуть слабее, чем в прошлый раз) */}
+        <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm pointer-events-none" />
 
-        {/* Контент: надписи и кнопка лежат поверх фона */}
+        {/* Контент лежит поверх фона */}
         <div className="relative z-10 w-full flex flex-col items-center">
           <h1 className="text-2xl font-bold tracking-tight mb-3">
             Музыкальные Мемори
