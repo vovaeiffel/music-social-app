@@ -22,6 +22,7 @@ import type { PinType } from "@/app/types/pin";
 import { usePinStore } from "@/app/store/pinStore";
 import { auth, provider, db } from "@/lib/firebase";
 import { signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
+import WelcomeScreen from "./components/WelcomeScreen";
 
 import {
   collection,
@@ -538,17 +539,7 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        <div className="max-w-md mx-auto pt-20">
-          <div className="absolute top-4 left-4 z-9999 bg-black/45 backdrop-blur-md border border-white/10 rounded-2xl px-3 py-2 shadow-xl">
-            <h1 className="text-3xl font-bold mb-4">Music Map</h1>
-            <button
-              onClick={signInWithGoogle}
-              className="w-full bg-white text-black p-3 rounded-xl font-semibold"
-            >
-              Sign in with Google
-            </button>
-          </div>
-        </div>
+        <WelcomeScreen onGoogleLogin={signInWithGoogle} />
       )}
     </main>
   );
