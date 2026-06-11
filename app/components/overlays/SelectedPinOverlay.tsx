@@ -7,6 +7,17 @@ import type { PinType } from "@/app/types/pin";
 import { useMap } from "react-leaflet";
 import { motion, AnimatePresence } from "framer-motion";
 import L from "leaflet";
+// Импортируем функции для работы с Firestore и базу данных (проверьте путь к вашему конфигу firebase)
+import { db } from "@/lib/firebase";
+import {
+  collection,
+  addDoc,
+  query,
+  where,
+  onSnapshot,
+  orderBy,
+  serverTimestamp,
+} from "firebase/firestore";
 
 // Вспомогательная функция для парсинга ссылок в iframe-формат
 function getEmbedUrl(type: string, url: string) {
@@ -46,6 +57,9 @@ type Props = {
   onEditPin: (pin: PinType) => void;
   onDeletePin: (pinId: string) => void;
   onOpenUserProfile: (userId: string) => void;
+  // Добавляем пропсы профиля текущего юзера (имя и аватар), чтобы знать, кто оставляет коммент
+  currentUserName?: string;
+  currentUserAvatar?: string;
 };
 
 function SelectedPinOverlay({
@@ -55,6 +69,8 @@ function SelectedPinOverlay({
   onEditPin,
   onDeletePin,
   onOpenUserProfile,
+  currentUserName,
+  currentUserAvatar,
 }: Props) {
   const selectedPin = usePinStore((state) => state.selectedPin);
   const pin = selectedPin;
@@ -69,6 +85,11 @@ function SelectedPinOverlay({
     url: string;
     embedUrl: string | null;
   } | null>(null);
+
+  // Состояния для комментариев
+  const [comments, setComments] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [commentText, setCommentText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!pin) return;
@@ -91,6 +112,50 @@ function SelectedPinOverlay({
       map.off("zoom", updatePosition);
     };
   }, [pin, map]);
+
+  // Подгрузка комментариев в реальном времени для выбранного пина
+  useEffect(() => {
+    if (!pin?.id) return;
+
+    const q = query(
+      collection(db, "comments"),
+      where("pinId", "==", pin.id),
+      orderBy("createdAt", "asc"),
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const loadedComments = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setComments(loadedComments);
+    });
+
+    return () => unsubscribe();
+  }, [pin?.id]);
+
+  // Функция отправки комментария
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentText.trim() || !pin || !currentUserId) return;
+
+    setIsSubmitting(true);
+    try {
+      await addDoc(collection(db, "comments"), {
+        pinId: pin.id,
+        userId: currentUserId,
+        userName: currentUserName || "Гость",
+        userAvatar: currentUserAvatar || "",
+        text: commentText.trim(),
+        createdAt: serverTimestamp(),
+      });
+      setCommentText(""); // Очищаем поле ввода после успешной отправки
+    } catch (error) {
+      console.error("Ошибка при добавлении комментария:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!pin) return null;
 
@@ -134,6 +199,7 @@ function SelectedPinOverlay({
             bg-zinc-900/85 supports-[backdrop-filter]:bg-zinc-900/70
             backdrop-blur-3xl border border-white/10
             shadow-[0_20px_80px_rgba(0,0,0,0.45)] p-4 text-white pointer-events-auto
+            max-h-[80vh] overflow-y-auto flex flex-col
           "
         >
           <div className="flex justify-between items-start mb-3">
@@ -282,6 +348,83 @@ function SelectedPinOverlay({
               </div>
             )}
           </div>
+
+          {/* --- БЛОК КОММЕНТАРИЕВ --- */}
+          <div className="mt-4 pt-4 border-t border-white/10 flex flex-col gap-3">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-white/50">
+              Комментарии ({comments.length})
+            </h3>
+
+            {/* Список комментариев с прокруткой, если их много */}
+            <div className="max-h-40 overflow-y-auto flex flex-col gap-2 pr-1">
+              {comments.length > 0 ? (
+                comments.map((comment) => (
+                  <div
+                    key={comment.id}
+                    className="bg-white/5 rounded-xl p-2.5 flex gap-2.5 text-xs"
+                  >
+                    {comment.userAvatar ? (
+                      <img
+                        src={comment.userAvatar}
+                        alt=""
+                        className="w-6 h-6 rounded-full flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                        {comment.userName?.[0]?.toUpperCase() || "G"}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <span className="font-semibold block text-white/70">
+                        {comment.userName || "Гость"}
+                      </span>
+                      <p className="text-white/90 break-words mt-0.5">
+                        {comment.text}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-[11px] text-white/30 italic py-1">
+                  Пока комментариев нет. Будьте первым!
+                </p>
+              )}
+            </div>
+
+            {/* Форма ввода нового комментария */}
+            {currentUserId ? (
+              <form onSubmit={handleAddComment} className="relative mt-1">
+                <input
+                  type="text"
+                  placeholder="Оставить комментарий..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  disabled={isSubmitting}
+                  className="
+                    w-full bg-white/5 border border-white/10 rounded-2xl py-2 pl-3 pr-10 
+                    text-xs text-white placeholder-white/30 focus:outline-none focus:border-white/20
+                    disabled:opacity-50
+                  "
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !commentText.trim()}
+                  className="
+                    absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-xl
+                    bg-white/10 hover:bg-white/20 flex items-center justify-center 
+                    transition disabled:opacity-30 text-[10px]
+                  "
+                >
+                  ➤
+                </button>
+              </form>
+            ) : (
+              <p className="text-[10px] text-white/40 text-center py-1">
+                Авторизуйтесь, чтобы оставлять комментарии
+              </p>
+            )}
+          </div>
+          {/* --- КОНЕЦ БЛОКА КОММЕНТАРИЕВ --- */}
         </div>
 
         {/* Боковой блок плеера */}

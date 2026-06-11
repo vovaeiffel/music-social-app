@@ -93,6 +93,8 @@ type Props = {
   onOpenUserProfile: (userId: string) => void;
   onPrepareNewPin: () => void;
   searchPos: [number, number] | null;
+  currentUserName: string;
+  currentUserAvatar: string;
 };
 
 // Вспомогательный компонент для управления камерой
@@ -113,6 +115,8 @@ export default function Map({
   onDeletePin,
   onOpenUserProfile,
   searchPos,
+  currentUserName,
+  currentUserAvatar,
 }: Props) {
   // Состояние для хранения выбранной подложки карты (по умолчанию первая)
   const [currentMap, setCurrentMap] = useState(() => {
@@ -250,6 +254,8 @@ export default function Map({
             onEditPin={onEditPin}
             onDeletePin={onDeletePin}
             onOpenUserProfile={onOpenUserProfile}
+            currentUserName={currentUserName}
+            currentUserAvatar={currentUserAvatar}
           />
         )}
 
