@@ -15,6 +15,7 @@ import {
 } from "@/app/services/userService";
 
 import { increment } from "firebase/firestore";
+import { Globe, Music } from "lucide-react";
 import { likePin, unlikePin, getUserLikes } from "@/app/services/likeService";
 import type { UserProfileType } from "@/app/types/user";
 import type { PinType } from "@/app/types/pin";
@@ -373,26 +374,6 @@ export default function Home() {
             }}
           />
 
-          <button
-            onClick={() => {
-              setSelectedUserProfile({
-                id: "fake_user_id_123",
-                username: "daft_punk_fan",
-                display_name: "Thomas Bangalter",
-                bio: "Electronic music lover",
-                status: "Listening to Homework 🎧",
-                avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=Thomas",
-                created_at: Date.now(),
-                pins_count: 12,
-                likes_received: 42,
-              });
-              setIsUserProfileOpen(true);
-            }}
-            className="absolute top-200 left-4 z-9999 bg-blue-500 px-3 py-2 rounded-xl"
-          >
-            TEST USER PANEL
-          </button>
-
           {isUserProfileOpen && (
             <UserProfilePanel
               profile={selectedUserProfile}
@@ -429,27 +410,35 @@ export default function Home() {
                   />
                 </div>
 
-                {/* 2. Кнопки (убираем из них лишний absolute!) */}
-                <div className="flex bg-zinc-900/80 backdrop-blur-md p-1 rounded-2xl border border-white/10 shadow-lg">
+                {/* 2. Кнопки переключения режима карты */}
+                <div className="flex bg-zinc-900/85 backdrop-blur-2xl p-1 rounded-2xl border border-white/10 shadow-2xl gap-1">
                   <button
                     onClick={() => setMapMode("global")}
-                    className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
+                    className={`px-4 py-2.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-2 ${
                       mapMode === "global"
-                        ? "bg-white text-black"
-                        : "text-zinc-400"
+                        ? "bg-white/10 text-white"
+                        : "text-zinc-400 hover:bg-white/5 hover:text-white"
                     }`}
                   >
-                    🌐 Global Map
+                    <Globe
+                      size={16}
+                      strokeWidth={mapMode === "global" ? 2.5 : 2}
+                    />
+                    <span>Global Map</span>
                   </button>
                   <button
                     onClick={() => setMapMode("personal")}
-                    className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all ${
+                    className={`px-4 py-2.5 text-xs font-semibold rounded-xl transition-all flex items-center gap-2 ${
                       mapMode === "personal"
-                        ? "bg-white text-black"
-                        : "text-zinc-400"
+                        ? "bg-white/10 text-white"
+                        : "text-zinc-400 hover:bg-white/5 hover:text-white"
                     }`}
                   >
-                    🎵 My Muments
+                    <Music
+                      size={16}
+                      strokeWidth={mapMode === "personal" ? 2.5 : 2}
+                    />
+                    <span>My Muments</span>
                   </button>
                 </div>
               </div>

@@ -14,7 +14,6 @@ import { useCreatePinStore } from "@/app/store/createPinStore";
 import L from "leaflet";
 
 import { clusterOptions } from "./map/config/clusterConfig";
-// import SearchBar from "./overlays/SearchBar"; // закомментировано, если не используется явно ниже
 
 import MapClickHandler from "./map/helpers/MapClickHandler";
 import { useMapPosition } from "@/app/hooks/useMapPosition";
@@ -48,7 +47,7 @@ const MAP_STYLES = [
     name: "OpenStreetMap (Подробная)",
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: "&copy; OpenStreetMap contributors",
-    hasLabels: false, // На ней уже есть все подписи и дороги
+    hasLabels: false,
   },
   {
     name: "Тёмная",
@@ -60,7 +59,7 @@ const MAP_STYLES = [
     name: "Спутник",
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution: "Tiles &copy; Esri",
-    hasLabels: true, // Прозрачный оверлей с названиями остается для спутника
+    hasLabels: true,
   },
   {
     name: "Минималистичная",
@@ -116,7 +115,18 @@ export default function Map({
   searchPos,
 }: Props) {
   // Состояние для хранения выбранной подложки карты (по умолчанию первая)
-  const [currentMap, setCurrentMap] = useState(MAP_STYLES[0]);
+  const [currentMap, setCurrentMap] = useState(() => {
+    if (typeof window !== "undefined") {
+      const savedMapName = localStorage.getItem("map_style");
+      const style = MAP_STYLES.find((s) => s.name === savedMapName);
+      if (style) return style;
+    }
+    return MAP_STYLES[0];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("map_style", currentMap.name);
+  }, [currentMap]);
 
   const {
     selectedPinType,
@@ -139,7 +149,27 @@ export default function Map({
 
   const selectedPin = usePinStore((state) => state.selectedPin);
   const setSelectedPin = usePinStore((state) => state.setSelectedPin);
-  const { center, zoom } = useMapPosition();
+
+  // Получаем базовые координаты из хука
+  const { center: hookCenter, zoom: hookZoom } = useMapPosition();
+
+  // Инициализация сохраненного центра из localStorage с SSR проверкой для Next.js
+  const [center, setCenter] = useState<[number, number]>(() => {
+    if (typeof window !== "undefined") {
+      const savedCenter = localStorage.getItem("map_center");
+      if (savedCenter) return JSON.parse(savedCenter);
+    }
+    return hookCenter || [59.9343, 30.3344];
+  });
+
+  // Инициализация сохраненного зума из localStorage
+  const [zoom, setZoom] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      const savedZoom = localStorage.getItem("map_zoom");
+      if (savedZoom) return parseInt(savedZoom, 10);
+    }
+    return hookZoom || 12;
+  });
 
   const handleCloseSelectedPin = useCallback(() => {
     setSelectedPin(null);
@@ -168,23 +198,25 @@ export default function Map({
       className="rounded-2xl overflow-hidden relative"
     >
       {/* Меню выбора карт поверх карты (справа вверху) */}
-      <div className="absolute top-4 right-4 z-[1000] bg-white/90 backdrop-blur-md p-2 rounded-xl shadow-lg border border-zinc-200 flex flex-col gap-1.5 max-w-[200px]">
-        <span className="text-xs font-semibold text-zinc-700 px-1">
+      <div className="absolute top-4 right-4 z-[1000] w-[180px] rounded-2xl bg-zinc-900/85 backdrop-blur-2xl border border-white/10 p-3 shadow-2xl flex flex-col gap-1">
+        <span className="text-xs font-semibold text-zinc-400 px-1 mb-1">
           Стиль карты:
         </span>
-        {MAP_STYLES.map((style) => (
-          <button
-            key={style.name}
-            onClick={() => setCurrentMap(style)}
-            className={`text-left text-xs px-3 py-1.5 rounded-lg transition-colors ${
-              currentMap.name === style.name
-                ? "bg-blue-600 text-white font-medium"
-                : "text-zinc-600 hover:bg-zinc-100"
-            }`}
-          >
-            {style.name}
-          </button>
-        ))}
+        <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto pr-1">
+          {MAP_STYLES.map((style) => (
+            <button
+              key={style.name}
+              onClick={() => setCurrentMap(style)}
+              className={`text-left text-xs px-3 py-2 rounded-xl transition-colors ${
+                currentMap.name === style.name
+                  ? "bg-white/10 text-white font-medium"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-white"
+              }`}
+            >
+              {style.name}
+            </button>
+          ))}
+        </div>
       </div>
 
       <MapContainer
@@ -236,7 +268,7 @@ export default function Map({
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png"
             attribution="&copy; CARTO contributors"
-            pane="overlayPane" // Гарантирует, что лейблы рисуются поверх базовой карты
+            pane="overlayPane"
           />
         )}
 
