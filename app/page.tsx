@@ -374,6 +374,15 @@ export default function Home() {
             }}
           />
 
+          {/* Вертикальный логотип MelMi на всю высоту левого края со светлой подсветкой */}
+          <div className="absolute left-4 top-[180px] bottom-8 z-20 hidden md:flex flex-col items-center pointer-events-none bg-white/80 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-2xl">
+            <img
+              src="/melmi-vertical.png"
+              alt="MelMi Vertical Logo"
+              className="w-auto h-full object-contain opacity-90"
+            />
+          </div>
+
           {isUserProfileOpen && (
             <UserProfilePanel
               profile={selectedUserProfile}
@@ -438,7 +447,7 @@ export default function Home() {
                       size={16}
                       strokeWidth={mapMode === "personal" ? 2.5 : 2}
                     />
-                    <span>My Muments</span>
+                    <span>My Map</span>
                   </button>
                 </div>
               </div>
