@@ -476,6 +476,8 @@ export default function Home() {
                   onPrepareNewPin={handleStartNewPin}
                   toggleLike={toggleLike}
                   currentUserId={user.id}
+                  currentUserName={user.name || ""}
+                  currentUserAvatar={user.avatar || ""}
                   onEditPin={(pin) => {
                     console.log("Редактирование пина с ID:", pin.id);
 
