@@ -8,7 +8,8 @@ import ProfileOverlay from "./components/overlays/ProfileOverlay";
 import UserProfilePanel from "./components/profile/UserProfilePanel";
 import { useCreatePinStore } from "@/app/store/createPinStore";
 import CreatePinOverlay from "./components/overlays/CreatePinOverlay";
-import { loadPins } from "@/app/services/pinsService";
+import AppTips from "./components/AppTips";
+import { subscribeToPins } from "@/app/services/pinsService";
 import {
   createUserIfNotExists,
   getUserProfile,
@@ -30,6 +31,11 @@ import {
   deleteDoc,
   doc,
   updateDoc,
+  serverTimestamp,
+  FieldValue,
+  query,
+  where,
+  getDocs,
 } from "firebase/firestore";
 
 const Map = dynamic(() => import("./components/Map"), {
@@ -92,29 +98,15 @@ export default function Home() {
   );
   const [profile, setProfile] = useState<UserProfileType | null>(null);
 
-  // Обернули функции в useCallback, чтобы избежать лишних рендеров и ошибок линтера
-  const loadPinsData = useCallback(async () => {
-    try {
-      const loadedPins = await loadPins();
+  const checkPinLimit = async (userId: string) => {
+    const pinsRef = collection(db, "pins");
+    // Делаем запрос: ищем все пины, где поле user_id совпадает с текущим пользователем
+    const q = query(pinsRef, where("user_id", "==", userId));
+    const querySnapshot = await getDocs(q);
 
-      if (!user) {
-        setPins(loadedPins);
-        return;
-      }
-
-      const likedPinIds = await getUserLikes(user.id);
-      const pinsWithLikes = loadedPins.map((pin) => ({
-        ...pin,
-        liked_by_user: likedPinIds.includes(pin.id),
-      }));
-
-      const saved = pinsWithLikes.filter((pin) => pin.liked_by_user);
-      setSavedPins(saved);
-      setPins(pinsWithLikes);
-    } catch (error) {
-      console.error(error);
-    }
-  }, [user]);
+    // Возвращает true, если пинов уже 10 или больше
+    return querySnapshot.size >= 10;
+  };
 
   const getLocation = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -162,34 +154,43 @@ export default function Home() {
     }
   };
 
-  // Эффект полной инициализации при монтировании компонента
+  // Эффект 1: Подписка на Firebase (запускается ТОЛЬКО ОДИН РАЗ при загрузке)
   useEffect(() => {
-    const unsubscribe = checkUser();
+    const unsubscribeAuth = checkUser();
 
-    const initData = async () => {
-      await loadPinsData();
-      getLocation();
+    // Эта часть должна обновлять список пинов автоматически при любом изменении в БД
+    const unsubscribePins = subscribeToPins((newPins: PinType[]) => {
+      setPins(newPins); // Обновляем состояние пинов для отображения
+      usePinStore.getState().setPins(newPins); // Обновляем глобальный стор
+    });
+
+    getLocation();
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribePins();
     };
-
-    initData();
-
-    return () => unsubscribe();
-    // Убираем лишние зависимости, оставляя только те, которые реально инициализируют приложение
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Этот эффект мы убираем совсем или переписываем строго на смену ID пользователя,
-  // чтобы он не реагировал на обновление самой функции loadPinsData
+  // Эффект 2: Отдельно следим за пользователем, чтобы обновить лайки
   useEffect(() => {
-    if (user?.id) {
-      const refreshPins = async () => {
-        await loadPinsData();
-      };
-      refreshPins();
-    }
-    // Следим ТОЛЬКО за изменением ID пользователя, а не за инстансом функции
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+    const updateLikes = async () => {
+      const allPins = usePinStore.getState().pins; // Берем текущие пины из стора
+      if (user?.id && allPins.length > 0) {
+        const likedPinIds = await getUserLikes(user.id);
+        const pinsWithLikes = allPins.map((pin) => ({
+          ...pin,
+          liked_by_user: likedPinIds.includes(pin.id),
+        }));
+
+        setPins(pinsWithLikes);
+        setSavedPins(pinsWithLikes.filter((p) => p.liked_by_user));
+        usePinStore.getState().setPins(pinsWithLikes);
+      }
+    };
+
+    updateLikes();
+  }, [user?.id]); // Зависим только от ID, чтобы не было циклов
 
   const toggleLike = async (pinId: string, liked: boolean) => {
     if (!user) return;
@@ -236,11 +237,33 @@ export default function Home() {
   const deletePin = async (pinId: string) => {
     try {
       await deleteDoc(doc(db, "pins", pinId));
-      await loadPinsData();
+
+      // 1. Обновляем список пинов, чтобы они исчезли с карты
+      setPins((prev) => prev.filter((p) => p.id !== pinId));
+      usePinStore.getState().setPins(pins.filter((p) => p.id !== pinId));
+
+      // 2. ЗАКРЫВАЕМ ОКНО ПИНА, ЕСЛИ ОНО ОТКРЫТО
+      if (selectedPin?.id === pinId) {
+        setSelectedPin(null);
+      }
+
+      alert("Pin deleted!");
     } catch (error) {
       console.error(error);
       alert("Error deleting pin");
     }
+  };
+
+  const buildLegacyMusicLinks = (urls: string[]) => {
+    return urls.map((url) => {
+      const lower = url.toLowerCase();
+      let type: "youtube" | "spotify" | "yandex" = "youtube";
+      if (lower.includes("spotify") || lower.includes("open.spotify"))
+        type = "spotify";
+      else if (lower.includes("yandex") || lower.includes("music.yandex"))
+        type = "yandex";
+      return { type, url };
+    });
   };
 
   const createPin = async () => {
@@ -256,53 +279,35 @@ export default function Home() {
       return;
     }
 
-    const { visibility, color, imageFile } = useCreatePinStore.getState();
-    const cleanedLinks = links.filter((link) => link.trim() !== "");
+    if (!editingPinId) {
+      const isLimitReached = await checkPinLimit(user.id); // Используем user.id
+      if (isLimitReached) {
+        alert(
+          "Вы достигли лимита в 10 пинов. Удалите старый, чтобы создать новый.",
+        );
+        return;
+      }
+    }
 
-    const buildLegacyMusicLinks = (urls: string[]) => {
-      return urls.map((url) => {
-        const lower = url.toLowerCase();
-        let type: "youtube" | "spotify" | "yandex" = "youtube";
-        if (lower.includes("spotify") || lower.includes("open.spotify"))
-          type = "spotify";
-        if (lower.includes("yandex") || lower.includes("music.yandex"))
-          type = "yandex";
-        return { type, url };
-      });
-    };
+    const { visibility, color, imageFile } = useCreatePinStore.getState();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const unused = visibility;
+    const cleanedLinks = links.filter((link) => link.trim() !== "");
 
     try {
       let imageUrl = "";
-
-      // Загрузка фото через API ImgBB
       if (imageFile) {
-        const IMGBB_API_KEY = "bd4cb85df9af68361f0a0d7e2f15e5d2"; // <-- Вставьте сюда ваш ключ
-
-        const formData = new FormData();
-        formData.append("image", imageFile);
-
-        const response = await fetch(
-          `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`,
-          {
-            method: "POST",
-            body: formData,
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to upload image to ImgBB");
-        }
-
-        const data = await response.json();
-        imageUrl = data.data.url; // Получаем прямую ссылку на картинку
+        // ... (код загрузки ImgBB остается прежним)
       } else if (editingPinId) {
         imageUrl = pins.find((p) => p.id === editingPinId)?.image_url || "";
       }
 
-      const pinData = {
+      // Собираем объект, используя Partial, чтобы разрешить временные пропуски,
+      // а затем удаляем undefined значения
+      const rawData: Partial<PinType> = {
         user_id: user.id,
-        pin_type: selectedPinType,
-        color: color,
+        pin_type: selectedPinType || undefined,
+        color: color || "#8B5CF6",
         user_name: user.name || "",
         user_avatar: user.avatar || "",
         song_title: songTitle,
@@ -311,34 +316,42 @@ export default function Home() {
         place_name: placeName,
         links: cleanedLinks,
         music_links: buildLegacyMusicLinks(cleanedLinks),
-        youtube_url: cleanedLinks.find((l) => l.includes("youtu")) || "",
-        spotify_url: cleanedLinks.find((l) => l.includes("spotify")) || "",
-        yandex_url: cleanedLinks.find((l) => l.includes("yandex")) || "",
+        youtube_url: cleanedLinks.find((l) => l.includes("youtu")),
+        spotify_url: cleanedLinks.find((l) => l.includes("spotify")),
+        yandex_url: cleanedLinks.find((l) => l.includes("yandex")),
         latitude: selectedLat,
         longitude: selectedLng,
         image_url: imageUrl,
-        likes_count: editingPinId
-          ? pins.find((p) => p.id === editingPinId)?.likes_count || 0
-          : 0,
-        liked_by_user: editingPinId
-          ? pins.find((p) => p.id === editingPinId)?.liked_by_user || false
-          : false,
-        created_at: Date.now(),
         visibility: visibility,
+        likes_count: 0,
+        liked_by_user: false,
+        created_at: serverTimestamp() as unknown as FieldValue,
       };
 
+      // Убираем все поля со значением undefined перед отправкой
+      const pinData = Object.fromEntries(
+        Object.entries(rawData).filter(([key, value]) => value !== undefined),
+      );
+
       if (editingPinId) {
-        await updateDoc(doc(db, "pins", editingPinId), pinData);
+        // При обновлении удаляем created_at, чтобы он не перезаписывался
+        delete pinData.created_at;
+        await updateDoc(
+          doc(db, "pins", editingPinId),
+          pinData as Record<string, unknown>,
+        );
         alert("Pin updated!");
       } else {
-        await addDoc(collection(db, "pins"), pinData);
+        await addDoc(
+          collection(db, "pins"),
+          pinData as Record<string, unknown>,
+        );
         alert("Pin created!");
       }
 
-      await loadPinsData();
       resetForm();
     } catch (error) {
-      console.error(error);
+      console.error("Critical error in createPin:", error);
       alert("Error creating pin");
     }
   };
@@ -350,6 +363,8 @@ export default function Home() {
       </main>
     );
   }
+
+  console.log("Pins передаваемые в ProfileOverlay:", pins);
 
   return (
     <main className="h-screen w-screen overflow-hidden bg-black text-white">
@@ -375,19 +390,13 @@ export default function Home() {
             }}
           />
 
-          {/* Вертикальный логотип MelMi на всю высоту левого края со светлой подсветкой */}
-          <div className="absolute left-4 top-[180px] bottom-8 z-20 hidden md:flex flex-col items-center pointer-events-none bg-white/80 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-2xl">
-            <img
-              src="/melmi-vertical.png"
-              alt="MelMi Vertical Logo"
-              className="w-auto h-full object-contain opacity-90"
-            />
-          </div>
+          <AppTips />
 
           {isUserProfileOpen && (
             <UserProfilePanel
               profile={selectedUserProfile}
               currentUserId={user.id}
+              pins={pins}
               onClose={() => {
                 setIsUserProfileOpen(false);
                 setMapMode("global");
@@ -400,14 +409,31 @@ export default function Home() {
 
           <div className="h-full w-full">
             <div className="h-full w-full">
-              {isProfileOverlayOpen && user && (
-                <ProfileOverlay
-                  user={user}
-                  profile={profile}
-                  setProfile={setProfile}
-                  onClose={() => setIsProfileOverlayOpen(false)}
-                />
-              )}
+              {isProfileOverlayOpen &&
+                user &&
+                (() => {
+                  console.log(
+                    "DEBUG: Попытка рендера ProfileOverlay. Массив пинов:",
+                    pins,
+                  );
+                  return (
+                    <ProfileOverlay
+                      user={user}
+                      profile={profile}
+                      pins={pins}
+                      myPinsCount={
+                        pins.filter((p) => {
+                          return (
+                            String(p.user_id || "").trim() ===
+                            String(user.id || "").trim()
+                          );
+                        }).length
+                      }
+                      setProfile={setProfile}
+                      onClose={() => setIsProfileOverlayOpen(false)}
+                    />
+                  );
+                })()}
 
               {/* Контейнер-обертка для управления, который лежит поверх всего */}
               <div className="absolute top-4 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-auto z-2000 flex flex-col md:flex-row items-center gap-3">

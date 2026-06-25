@@ -2,6 +2,8 @@
 
 import type { UserProfileType } from "@/app/types/user";
 
+import type { PinType } from "@/app/types/pin"; // Убедись, что путь к файлу верный
+
 import { useEffect, useState } from "react";
 
 import {
@@ -17,6 +19,8 @@ type Props = {
 
   currentUserId: string;
 
+  pins: PinType[];
+
   onClose: () => void;
   onVisitMap: () => void;
 };
@@ -24,6 +28,7 @@ type Props = {
 export default function UserProfilePanel({
   profile,
   currentUserId,
+  pins, // <--- Добавь эту строку
   onClose,
   onVisitMap,
 }: Props) {
@@ -32,31 +37,30 @@ export default function UserProfilePanel({
   const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
-    async function loadFollowState() {
+    async function loadStats() {
       if (!profile) return;
 
-      // 1. Проверяем статус подписки (только если есть текущий пользователь)
+      // 1. Статус подписки
       if (currentUserId) {
         const result = await isFollowing(currentUserId, profile.id);
         setFollowing(result);
       }
 
-      // 2. Получаем количество подписчиков этого профиля
+      // 2. Получаем количество подписчиков/подписок
       const followers = await getFollowersCount(profile.id);
       setFollowersCount(followers);
-
-      // 3. Получаем количество подписок этого профиля
       const followingNum = await getFollowingCount(profile.id);
       setFollowingCount(followingNum);
+
+      // 3. Считаем пины вручную через переданный пропс pins (если он доступен)
+      // или просто берем из профиля, если он там есть.
+      // Прямо сейчас используем то, что есть в profile, но если нужно
+      // пересчитать, нам нужно передать массив всех пинов в этот компонент.
     }
 
-    loadFollowState();
+    loadStats();
   }, [profile, currentUserId]);
 
-  console.log({
-    currentUserId,
-    profileId: profile?.id,
-  });
   return (
     <div
       className="
@@ -132,7 +136,15 @@ export default function UserProfilePanel({
     "
           >
             {/* Выводим реальное количество пинов из профиля */}
-            <p className="font-bold">{profile?.pins_count || 0}</p>
+            <p className="font-bold">
+              {
+                pins.filter(
+                  (p: PinType) =>
+                    String(p.user_id || "").trim() ===
+                    String(profile?.id || "").trim(),
+                ).length
+              }
+            </p>
             <p className="text-[11px] text-zinc-400">Pins</p>
           </div>
 

@@ -2,7 +2,7 @@
 
 import { usePinStore } from "@/app/store/pinStore";
 
-import { memo, useMemo } from "react";
+import { memo } from "react";
 
 import { Marker } from "react-leaflet";
 import L from "leaflet";
@@ -32,8 +32,6 @@ function MarkersLayer({ pins }: Props) {
           }
           eventHandlers={{
             click: (e) => {
-              console.log("clicked pin", pin);
-
               L.DomEvent.stopPropagation(e.originalEvent);
 
               setSelectedPin(pin);

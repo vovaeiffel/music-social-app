@@ -191,8 +191,6 @@ export default function Map({
     setIsCreatingPin(true);
   };
 
-  console.log("pins", pins);
-
   return (
     <div
       style={{

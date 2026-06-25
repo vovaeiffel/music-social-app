@@ -17,6 +17,8 @@ import {
   onSnapshot,
   orderBy,
   serverTimestamp,
+  deleteDoc,
+  doc,
 } from "firebase/firestore";
 
 // Вспомогательная функция для парсинга ссылок в iframe-формат
@@ -73,6 +75,7 @@ function SelectedPinOverlay({
   currentUserAvatar,
 }: Props) {
   const selectedPin = usePinStore((state) => state.selectedPin);
+
   const pin = selectedPin;
   const map = useMap();
 
@@ -137,7 +140,22 @@ function SelectedPinOverlay({
   // Функция отправки комментария
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentText.trim() || !pin || !currentUserId) return;
+    e.stopPropagation(); // Гарантированно останавливаем всплытие
+
+    console.log("Кнопка нажата, текст:", commentText); // <--- ЭТОТ ЛОГ ПОКАЖЕТ, РАБОТАЕТ ЛИ ФОРМА
+
+    if (!commentText.trim()) {
+      console.warn("Текст пуст");
+      return;
+    }
+    if (!pin) {
+      console.warn("Нет пина");
+      return;
+    }
+    if (!currentUserId) {
+      console.warn("Нет пользователя");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -149,15 +167,32 @@ function SelectedPinOverlay({
         text: commentText.trim(),
         createdAt: serverTimestamp(),
       });
-      setCommentText(""); // Очищаем поле ввода после успешной отправки
+      console.log("Комментарий успешно отправлен");
+      setCommentText("");
     } catch (error) {
-      console.error("Ошибка при добавлении комментария:", error);
+      console.error("Ошибка Firebase при отправке:", error); // Если ошибка здесь, значит, проблема в правилах доступа
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (!pin) return null;
+
+  const handleDeleteComment = async (
+    commentId: string,
+    commentUserId: string,
+  ) => {
+    if (commentUserId !== currentUserId) {
+      alert("Вы можете удалять только свои комментарии");
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "comments", commentId));
+    } catch (error) {
+      console.error("Ошибка при удалении:", error);
+    }
+  };
 
   const handleMusicLinkClick = (type: string, url: string) => {
     const embedUrl = getEmbedUrl(type, url);
@@ -356,12 +391,12 @@ function SelectedPinOverlay({
             </h3>
 
             {/* Список комментариев с прокруткой, если их много */}
-            <div className="max-h-40 overflow-y-auto flex flex-col gap-2 pr-1">
+            <div className="max-h-40 overflow-y-auto flex flex-col gap-2 pr-2 custom-scrollbar">
               {comments.length > 0 ? (
                 comments.map((comment) => (
                   <div
                     key={comment.id}
-                    className="bg-white/5 rounded-xl p-2.5 flex gap-2.5 text-xs"
+                    className="bg-white/5 rounded-xl p-2.5 flex gap-2.5 text-xs group" // Добавили класс group
                   >
                     {comment.userAvatar ? (
                       <img
@@ -374,13 +409,26 @@ function SelectedPinOverlay({
                         {comment.userName?.[0]?.toUpperCase() || "G"}
                       </div>
                     )}
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 flex-1 relative">
+                      {" "}
+                      {/* Добавили relative */}
                       <span className="font-semibold block text-white/70">
                         {comment.userName || "Гость"}
                       </span>
                       <p className="text-white/90 break-words mt-0.5">
                         {comment.text}
                       </p>
+                      {/* Кнопка удаления */}
+                      {currentUserId === comment.userId && (
+                        <button
+                          onClick={() =>
+                            handleDeleteComment(comment.id, comment.userId)
+                          }
+                          className="absolute right-0 top-0 text-[10px] text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          Удалить
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))

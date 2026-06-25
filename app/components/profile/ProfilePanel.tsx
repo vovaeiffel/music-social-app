@@ -396,7 +396,13 @@ export default function ProfilePanel(props: Props) {
                 <div className="grid grid-cols-3 gap-2 bg-white/5 rounded-2xl p-2 text-center">
                   <div>
                     <p className="font-bold text-sm text-white">
-                      {profile?.pins_count || 0}
+                      {
+                        pins.filter(
+                          (p) =>
+                            String(p.user_id || "").trim() ===
+                            String(user.id || "").trim(),
+                        ).length
+                      }
                     </p>
                     <p className="text-[10px] text-zinc-400">Pins</p>
                   </div>

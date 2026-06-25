@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { motion } from "framer-motion";
+import type { PinType } from "@/app/types/pin";
 
 import { getUserProfile } from "@/app/services/userService";
 
@@ -19,6 +20,10 @@ type Props = {
 
   profile: UserProfileType | null;
 
+  pins: PinType[];
+
+  myPinsCount: number;
+
   setProfile: (profile: UserProfileType) => void;
 
   onClose: () => void;
@@ -27,6 +32,8 @@ type Props = {
 export default function ProfileOverlay({
   user,
   profile,
+  pins,
+  myPinsCount,
   setProfile,
   onClose,
 }: Props) {
@@ -152,6 +159,11 @@ export default function ProfileOverlay({
       >
         <div className="flex justify-between items-center mb-5">
           <h2 className="text-lg font-semibold">Edit profile</h2>
+
+          {/* Счётчик, который будет брать данные из page.tsx */}
+          <div className="text-xs text-zinc-500">
+            Pins: <span className="text-white font-bold">{myPinsCount}</span>
+          </div>
 
           <button onClick={onClose} className="text-white/50 hover:text-white">
             ×
