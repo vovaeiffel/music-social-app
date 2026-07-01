@@ -54,6 +54,7 @@ type Props = {
   pins: PinType[];
   savedPins: PinType[];
   isShowingSaved: boolean;
+  openProfileOverlay: () => void;
   setIsShowingSaved: (value: boolean) => void;
   isProfileOpen: boolean;
   setSelectedPin: (pin: PinType) => void;

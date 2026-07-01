@@ -8,12 +8,16 @@ import { updateUserProfile } from "@/app/services/userService";
 
 import type { UserProfileType } from "@/app/types/user";
 
+import type { PinType } from "@/app/types/pin";
+
 type Props = {
   user: {
     id: string;
     name?: string;
     avatar?: string;
   };
+
+  pins: PinType[];
 
   profile: UserProfileType | null;
 
