@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 import { motion } from "framer-motion";
-import type { PinType } from "@/app/types/pin";
 
 import { updateUserProfile } from "@/app/services/userService";
 

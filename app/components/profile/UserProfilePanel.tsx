@@ -28,7 +28,7 @@ type Props = {
 export default function UserProfilePanel({
   profile,
   currentUserId,
-  pins, // <--- Добавь эту строку
+  pins,
   onClose,
   onVisitMap,
 }: Props) {
@@ -51,11 +51,6 @@ export default function UserProfilePanel({
       setFollowersCount(followers);
       const followingNum = await getFollowingCount(profile.id);
       setFollowingCount(followingNum);
-
-      // 3. Считаем пины вручную через переданный пропс pins (если он доступен)
-      // или просто берем из профиля, если он там есть.
-      // Прямо сейчас используем то, что есть в profile, но если нужно
-      // пересчитать, нам нужно передать массив всех пинов в этот компонент.
     }
 
     loadStats();
