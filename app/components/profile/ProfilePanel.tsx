@@ -60,13 +60,10 @@ type Props = {
   onLogout: () => void;
   onOpenSettings: () => void;
   setIsProfileOpen: (value: boolean) => void;
-  openProfileOverlay: () => void;
   onOpenUserProfile?: (profile: UserProfileType) => void;
 };
 
 export default function ProfilePanel(props: Props) {
-  console.log(props);
-
   const {
     user,
     profile,
@@ -79,7 +76,6 @@ export default function ProfilePanel(props: Props) {
     setSelectedPin,
     onLogout,
     onOpenSettings,
-    onOpenUserProfile,
   } = props;
 
   const [showAllPins, setShowAllPins] = useState(false);
@@ -109,11 +105,6 @@ export default function ProfilePanel(props: Props) {
 
     loadOwnStats();
   }, [user?.id, profile]);
-
-  console.log("saved state:", {
-    isShowingSaved,
-    setIsShowingSaved,
-  });
 
   return (
     <div className="absolute top-4 left-4 z-[3000]">

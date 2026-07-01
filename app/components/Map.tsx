@@ -100,9 +100,11 @@ type Props = {
 // Вспомогательный компонент для управления камерой
 function FlyToHandler({ position }: { position: [number, number] | null }) {
   const map = useMap();
-  if (position) {
-    map.flyTo(position, 14);
-  }
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, 14);
+    }
+  }, [position, map]);
   return null;
 }
 
@@ -142,14 +144,6 @@ export default function Map({
     setIsCreatingPin,
     resetForm,
   } = useCreatePinStore();
-
-  useEffect(() => {
-    console.log("DEBUG: Map state changed:", {
-      isCreatingPin,
-      selectedLat,
-      selectedLng,
-    });
-  }, [isCreatingPin, selectedLat, selectedLng]);
 
   const selectedPin = usePinStore((state) => state.selectedPin);
   const setSelectedPin = usePinStore((state) => state.setSelectedPin);

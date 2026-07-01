@@ -5,8 +5,6 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import type { PinType } from "@/app/types/pin";
 
-import { getUserProfile } from "@/app/services/userService";
-
 import { updateUserProfile } from "@/app/services/userService";
 
 import type { UserProfileType } from "@/app/types/user";
@@ -20,8 +18,6 @@ type Props = {
 
   profile: UserProfileType | null;
 
-  pins: PinType[];
-
   myPinsCount: number;
 
   setProfile: (profile: UserProfileType) => void;
@@ -32,7 +28,6 @@ type Props = {
 export default function ProfileOverlay({
   user,
   profile,
-  pins,
   myPinsCount,
   setProfile,
   onClose,
@@ -44,24 +39,6 @@ export default function ProfileOverlay({
   const [bio, setBio] = useState("");
 
   const [status, setStatus] = useState("");
-
-  useEffect(() => {
-    async function loadProfile() {
-      const profile = await getUserProfile(user.id);
-
-      if (!profile) return;
-
-      setUsername(profile.username || "");
-
-      setDisplayName(profile.display_name || "");
-
-      setBio(profile.bio || "");
-
-      setStatus(profile.status || "music explorer");
-    }
-
-    loadProfile();
-  }, [user.id]);
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {

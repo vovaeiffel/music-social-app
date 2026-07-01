@@ -1,10 +1,16 @@
-import { collection, onSnapshot, query } from "firebase/firestore";
+// 1. ИМПОРТЫ (всегда сверху)
+import {
+  collection,
+  onSnapshot,
+  query,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { PinType } from "@/app/types/pin";
 
-// pinsService.ts
+// 2. subscribeToPins
 export function subscribeToPins(callback: (pins: PinType[]) => void) {
-  // Убедись, что здесь ПРОСТО запрос к коллекции
   const q = query(collection(db, "pins"));
 
   return onSnapshot(q, (snapshot) => {
@@ -12,7 +18,7 @@ export function subscribeToPins(callback: (pins: PinType[]) => void) {
       id: doc.id,
       ...(doc.data() as Omit<PinType, "id">),
     }));
-    // Вызываем колбэк только тогда, когда данные РЕАЛЬНО пришли
+
     callback(pins);
   });
 }
