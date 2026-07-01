@@ -49,16 +49,23 @@ function CreatePinOverlay({ lat, lng, createPin, onClose }: Props) {
     >
       <div className="rounded-3xl bg-zinc-900/85 supports-[backdrop-filter]:bg-zinc-900/70 backdrop-blur-3xl border border-white/10 shadow-[0_20px_80px_rgba(0,0,0,0.45)] p-4 text-white origin-bottom max-h-[85vh] flex flex-col overflow-hidden">
         {/* ШАПКА ОВЕРЛЕЯ */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin pr-2">
+        <div className="flex-1 pr-2">
+          {/* Header (не скроллится) */}
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-white/90">New memory</h2>
+
+            <button
+              onClick={onClose}
+              className="text-white/40 hover:text-white text-lg"
+            >
+              ×
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white/40 hover:text-white text-lg"
-          >
-            ×
-          </button>
+
+          {/* Scroll area */}
+          <div className="overflow-y-auto scrollbar-thin">
+            {/* content goes here */}
+          </div>
         </div>
 
         <div className="space-y-3">
